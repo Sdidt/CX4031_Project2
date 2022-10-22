@@ -1,17 +1,22 @@
 import os
 from dotenv import load_dotenv
+from tree import Node
 
 load_dotenv()
 import psycopg2 
 
-def retrieve_plans(actual_plan: dict):
+def construct_operator_tree(actual_plan: dict):
     q = [actual_plan.copy()]
     # print(actual_plan.keys())
     actual_plan.pop("Plans")
+    node_list = [Node(actual_plan.copy())]
+    root = node_list[0]
     print(actual_plan)
     # print(q)
     while len(q) != 0:
         actual_plan = q.pop(0)
+        parent: Node = node_list.pop(0)
+        print(parent.data)
         # print("Actual plan:")
         # print(actual_plan)
         if "Plans" not in actual_plan:
@@ -23,8 +28,13 @@ def retrieve_plans(actual_plan: dict):
             # print(plan)
             if "Plans" in plan:
                 q.append(plan.copy())
-            plan.pop("Plans", "No key found")
+                plan.pop("Plans")
+                node_list.append(Node(plan.copy()))
+                parent.add_child(node_list[-1])
+            else:
+                parent.add_child(Node(plan.copy()))
             print(plan)
+    print(root.print_tree())
 
 
 conn = psycopg2.connect(database="TPC-H", user=os.getenv('DB_USERNAME'), password=os.getenv('DB_PASSWORD'), host="127.0.0.1", port=5432)
@@ -67,13 +77,13 @@ select
       l_linestatus;
 """
 
-cursor.execute('EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ' + complex_sql_qeury)
+cursor.execute('EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ' + sql_query)
 analyze_fetched = cursor.fetchall()
 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")
 print(actual_plan)
 print("Decomposed results:")
-retrieve_plans(actual_plan)
+construct_operator_tree(actual_plan)
 
 conn.close()
