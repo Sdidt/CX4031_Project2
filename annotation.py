@@ -20,9 +20,9 @@ def retrieve_plans(actual_plan: dict):
         actual_plan = actual_plan["Plans"]
         # print(len(actual_plan))
         for plan in actual_plan:
-            # print(plan.keys())
+            # print(plan)
             if "Plans" in plan:
-                q.extend(plan["Plans"])
+                q.append(plan.copy())
             plan.pop("Plans", "No key found")
             print(plan)
 
@@ -37,7 +37,7 @@ cursor.execute("select version()")
 data = cursor.fetchone()
 print("Connection established to: ",data)
 
-cursor.execute("enable_hashjoin(false)")
+# cursor.execute("set enable_hashjoin = false")
 
 cursor.fetchall()
 
@@ -67,7 +67,7 @@ select
       l_linestatus;
 """
 
-cursor.execute('EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ' + sql_query)
+cursor.execute('EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ' + complex_sql_qeury)
 analyze_fetched = cursor.fetchall()
 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
