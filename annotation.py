@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from result_parser import ResultParser
 from tree import Node
 
 load_dotenv()
@@ -16,11 +17,11 @@ def construct_operator_tree(actual_plan: dict):
     while len(q) != 0:
         actual_plan = q.pop(0)
         parent: Node = node_list.pop(0)
-        print(parent.data)
+        # print(parent.plan)
         # print("Actual plan:")
         # print(actual_plan)
         if "Plans" not in actual_plan:
-            print(actual_plan)
+            # print(actual_plan)
             continue
         actual_plan = actual_plan["Plans"]
         # print(len(actual_plan))
@@ -33,9 +34,34 @@ def construct_operator_tree(actual_plan: dict):
                 parent.add_child(node_list[-1])
             else:
                 parent.add_child(Node(plan.copy()))
-            print(plan)
+            # print(plan)
     print(root.print_tree())
+    return root
 
+def annotate_various_nodes(root: Node):
+	result_parser = ResultParser()
+	level = 1
+	q = [(root, level)]
+	reverse_order = []
+	prev_level = -1
+	while len(q) != 0:
+		cursor, level = q.pop(0)
+		reverse_order.insert(0, (cursor, level))
+		if level != prev_level:
+			print("Level " + str(level))
+			prev_level = level
+		# print(cursor.plan)
+		q.extend([(child, level + 1) for child in cursor.children])
+	while len(reverse_order) != 0:
+		cursor, level = reverse_order.pop(0)
+		# print(cursor.plan)
+		if cursor.plan["Node Type"] == "Seq Scan":
+			print(result_parser.seq_scan_rule(cursor, level == 1))
+		elif cursor.plan["Node Type"] == "Hash":
+			print(result_parser.hash_rule(cursor))
+		elif cursor.plan["Node Type"] == "Hash Join":
+			print(result_parser.hash_join_rule(cursor, level == 1))
+		
 
 conn = psycopg2.connect(database="TPC-H", user=os.getenv('DB_USERNAME'), password=os.getenv('DB_PASSWORD'), host="127.0.0.1", port=5432)
 
@@ -75,7 +101,7 @@ select
     order by
       l_returnflag,
       l_linestatus;
-"""
+"""   
 
 cursor.execute('EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ' + sql_query)
 analyze_fetched = cursor.fetchall()
@@ -83,7 +109,9 @@ analyze_fetched = cursor.fetchall()
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")
 print(actual_plan)
-print("Decomposed results:")
-construct_operator_tree(actual_plan)
+print("Operator Tree:")
+root = construct_operator_tree(actual_plan)
+
+annotate_various_nodes(root)
 
 conn.close()
