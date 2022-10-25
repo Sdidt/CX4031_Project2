@@ -94,5 +94,5 @@ class ResultParser:
         natural_text = "perform sort on table "
         return natural_text
     
-    
+ 
     
