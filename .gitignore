@@ -3,3 +3,4 @@ project2_env
 Database
 .env
 __pycache__
+*.txt

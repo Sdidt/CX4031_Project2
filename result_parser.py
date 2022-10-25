@@ -10,8 +10,30 @@ class ResultParser:
             "Sort": None,
             "Hash": self.hash_rule,
         }
+        self.component_to_plan_mapping = {
+            "select": ["Aggregate"],
+            "from": ["Seq Scan", "Index Scan", "Index-Only Scan", "Bitmap Scan"],
+            "where": ["Hash Join", "Merge Join"],
+            "group by": ["Aggregate"],
+            "having": ["Aggregate"],
+            "as": ["Alias"],
+            "order by": ["Sort"]
+        }
+        self.plan_to_component_mapping = {
+            "Aggregate": {
+                "No Filter": "select",
+                "Filter": "having"
+            },
+            "Seq Scan": "from",
+            "Hash Join": "where",
+            
+        }
         self.query_annotation = {}
         self.curr_intermediate_table_count = 1
+
+    def remove_colons(self, condition):
+        position = condition.find(":")
+        return condition[:position] + ")"
 
     def seq_scan_rule(self, plan_node: Node, is_final: bool):
         plan = plan_node.plan
@@ -23,7 +45,7 @@ class ResultParser:
             exit()
         intermediate_table_name = None
         if "Filter" in plan:
-            condition = plan["Filter"]
+            condition = self.remove_colons(plan["Filter"])
             intermediate_table_name = "T" + str(self.curr_intermediate_table_count)
             self.curr_intermediate_table_count += 1
             if not is_final:
@@ -61,13 +83,16 @@ class ResultParser:
         if not is_final:
             intermediate_table_name = "T" + str(self.curr_intermediate_table_count)
             self.curr_intermediate_table_count += 1
-            natural_text += " under condition " + plan["Hash Cond"] + " to obtain intermediate table " + intermediate_table_name
+            natural_text += " under condition " + self.remove_colons(plan["Hash Cond"]) + " to obtain intermediate table " + intermediate_table_name
         else:
-            natural_text += " under condition " + plan["Hash Cond"] + " to obtain final result"
+            natural_text += " under condition " + self.remove_colons(plan["Hash Cond"]) + " to obtain final result"
         natural_text += "."
         plan_node.result_table_name = intermediate_table_name
         return natural_text
 
+    def sort_rule(self, plan_node: Node, is_final: bool):
+        natural_text = "perform sort on table "
+        return natural_text
     
     
     
