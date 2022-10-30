@@ -130,7 +130,7 @@ select
             supplier,
             nation
           where
-            ps_suppkey = s_suppkey
+            not ps_suppkey < s_suppkey
             and s_nationkey = n_nationkey
             and n_name = 'AUSTRIA'
         )
@@ -140,7 +140,7 @@ select
 
 print(sql_query)
 
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + sql_query)
+analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + long_query)
 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")
@@ -151,3 +151,5 @@ root = construct_operator_tree(actual_plan)
 annotate_various_nodes(root)
 
 db.close()
+
+# Use SequenceMatcher from difflib for heuristic based matching of query clauses to nodes
