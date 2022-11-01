@@ -11,7 +11,7 @@ def construct_operator_tree(actual_plan: dict):
     actual_plan.pop("Plans")
     node_list = [Node(actual_plan.copy())]
     root = node_list[0]
-    print(actual_plan)
+    # print(actual_plan)
     # print(q)
     while len(q) != 0:
         actual_plan = q.pop(0)
@@ -107,40 +107,40 @@ select
 """   
 
 long_query = """
-select
-      ps_partkey,
-      sum(ps_supplycost * ps_availqty) as value
-    from
-      partsupp,
-      supplier,
-      nation
-    where
-      ps_suppkey = s_suppkey
-      and s_nationkey = n_nationkey
-      and n_name = 'GERMANY'
-      and ps_supplycost > 20
-      and s_acctbal > 10
-    group by
-      ps_partkey having
-        sum(ps_supplycost * ps_availqty) > (
-          select
-            sum(ps_supplycost * ps_availqty) * 0.0001000000
-          from
+        select
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) as value
+            from
             partsupp,
             supplier,
             nation
-          where
-            not ps_suppkey < s_suppkey
-            and s_nationkey = n_nationkey
-            and n_name = 'AUSTRIA'
-        )
-    order by
-      value desc;
-"""
+            where
+            ps_suppkey = s_suppkey
+            and not s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+            and ps_supplycost > 20
+            and s_acctbal > 10
+            group by
+            ps_partkey having
+                sum(ps_supplycost * ps_availqty) > (
+                select
+                    sum(ps_supplycost * ps_availqty) * 0.0001000000
+                from
+                    partsupp,
+                    supplier,
+                    nation
+                where
+                    ps_suppkey = s_suppkey
+                    and s_nationkey = n_nationkey
+                    and n_name = 'GERMANY'
+                )
+            order by
+            value desc;
+    """
 
-print(sql_query)
+print(complex_query)
 
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + long_query)
+analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + complex_query)
 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")
