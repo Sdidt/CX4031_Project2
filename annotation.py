@@ -145,6 +145,8 @@ analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")
 print(actual_plan)
+
+
 print("Operator Tree:")
 root = construct_operator_tree(actual_plan)
 
