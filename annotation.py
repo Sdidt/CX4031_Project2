@@ -81,7 +81,7 @@ print(result)
 
 sql_query = 'SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey'
 
-complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
+complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by sum_disc_price, l_linestatus order by sum_disc_price, l_linestatus"
 
 complex_sql_query = """
 select 
@@ -108,7 +108,7 @@ select
 
 long_query = """
         select
-            ps_partkey,
+            ps_partkey as blahblah,
             sum(ps_supplycost * ps_availqty) as value
             from
             partsupp,
@@ -126,7 +126,7 @@ long_query = """
                 select
                     sum(ps_supplycost * ps_availqty) * 0.0001000000
                 from
-                    partsupp,
+                    partsupp blahblah,
                     supplier,
                     nation N
                 where

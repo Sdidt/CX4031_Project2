@@ -24,6 +24,7 @@ class PreProcessor:
             ">=": "<"
         }
         self.curr_subquery_num = 0
+        self.tables_aliases = self.parser.tables_aliases
         self.aggregate_list = ["count", "sum", "avg", "approx_count_distinct", "max", "min", "stdev", "stdevp", "var", "varp", "string_agg"]
         self.decomposed_query = self.extract_keywords(self.tokens, {"subqueries": {}})
 
@@ -33,6 +34,22 @@ class PreProcessor:
             reconstructed_query += ' {}'.format(clause.strip())
         return reconstructed_query
         
+    def print_token_debug_info(self, t:token.SQLToken):
+        print("Value: " + str(t.value))
+        print(t.is_keyword)
+        print("Different types: ")
+        print("Is keyword: " + str(t.is_keyword))
+        print("Is punctuation: " + str(t.is_punctuation))
+        print("Is dot: " + str(t.is_dot))
+        print("Is wildcard: " + str(t.is_wildcard))
+        print("Is integer: " + str(t.is_integer))
+        print("Is float: " + str(t.is_float))
+        print("Is comment: " + str(t.is_comment))
+        print("Is as keyword: " + str(t.is_as_keyword))
+        print("Is left parenthesis: " + str(t.is_left_parenthesis))
+        print("Is right parenthesis: " + str(t.is_right_parenthesis))
+        print("Parenthesis level: " + str(t.parenthesis_level))
+
     def get_metadata(self):
         db = DB()
         result = db.execute("select table_name from information_schema.tables where table_schema='public'")
@@ -58,13 +75,17 @@ class PreProcessor:
         return query_columns
 
     def prepend_table_name_to_column(self, t: token.SQLToken):
-        if (t.value.lower() in self.columns):
+        if t.value.lower() in self.columns:
             column_name = t.value.lower()
             t.value = self.column_to_table_mapping[t.value.lower()]
             if (self.curr_subquery_num != 0):
                 t.value += "_" + str(self.curr_subquery_num)
             t.value += "." + column_name
         return t
+
+    def print_query_debug_info(self):
+        for t in self.tokens:
+            self.print_token_debug_info(t)
 
     def handle_as_keyword(self, decomposed_query, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
         if t.value not in decomposed_query:
@@ -95,6 +116,9 @@ class PreProcessor:
             t: token.SQLToken = self.prepend_table_name_to_column(clause_tokens[i])
             t = self.replace_alias_with_expression(decomposed_query, t)
             print("Value: " + str(t.value))
+            if (t.value.lower() == "date"):
+                i += 1
+                continue
             if (t.parenthesis_level != last_keyword_token.parenthesis_level) and (t.is_keyword and t.value.lower() not in ["and", "or", "not"]):
                 contains_subquery = True
                 subquery_start_index = i
@@ -167,7 +191,8 @@ class PreProcessor:
         i = 0
         semicolon_present = False
         while i < len(tokens):
-            t: token.SQLToken = self.prepend_table_name_to_column(tokens[i])
+            t: token.SQLToken = tokens[i]
+            t = self.prepend_table_name_to_column(t)
             t = self.replace_alias_with_expression(decomposed_query, t)
             print("Value: " + str(t.value))
             if (t.value.lower() == ";"):
@@ -176,7 +201,6 @@ class PreProcessor:
                 last_comma_index = i
                 print("Done processing the query!")
                 i += 1
-                print(decomposed_query)
                 continue
 
             if (t.value == ","):
@@ -234,7 +258,11 @@ class PreProcessor:
                     print("Reached subquery case")
                     self.curr_subquery_num += 1
                     decomposed_query, i, subquery_alias = self.extract_subquery(decomposed_query, tokens, i, last_keyword_token, t)
-
+            print([key.lower() for key in self.tables_aliases])
+            if (t.value in self.tables_aliases):
+                print("reached table alias")
+                tokens.pop(i)
+                continue
             # aggregates
             # elif t.value.lower() in self.aggregate_list:
             #     agg = t.value.lower()
@@ -269,13 +297,13 @@ class PreProcessor:
 
 
 if __name__ == "__main__":
-    complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
+    complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by sum_disc_price, l_linestatus order by sum_disc_price, l_linestatus"
     long_query = """
         select
             ps_partkey,
             sum(ps_supplycost * ps_availqty) as value
             from
-            partsupp,
+            partsupp P,
             supplier,
             nation
             where
@@ -290,9 +318,9 @@ if __name__ == "__main__":
                 select
                     sum(ps_supplycost * ps_availqty) * 0.0001000000
                 from
-                    partsupp P,
+                    partsupp P1,
                     supplier S,
-                    nation N
+                    nation
                 where
                     ps_suppkey = s_suppkey
                     and s_nationkey = n_nationkey
@@ -303,6 +331,7 @@ if __name__ == "__main__":
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
     preprocessor = PreProcessor(long_query)
+    # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)
     print(preprocessor.decomposed_query)
@@ -310,4 +339,5 @@ if __name__ == "__main__":
     print(preprocessor.parser.columns_aliases_names)
     print(preprocessor.parser.columns_aliases)
     print(preprocessor.parser.tables_aliases)
+    print(preprocessor.tables)
     # print(preprocessor.query)
