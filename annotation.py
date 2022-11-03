@@ -81,7 +81,7 @@ print(result)
 
 sql_query = 'SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey'
 
-complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus"
+complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
 
 complex_sql_query = """
 select 
@@ -113,7 +113,7 @@ long_query = """
             from
             partsupp,
             supplier,
-            nation
+            nation m
             where
             ps_suppkey = s_suppkey
             and not s_nationkey = n_nationkey
@@ -128,7 +128,7 @@ long_query = """
                 from
                     partsupp,
                     supplier,
-                    nation
+                    nation N
                 where
                     ps_suppkey = s_suppkey
                     and s_nationkey = n_nationkey
@@ -140,7 +140,7 @@ long_query = """
 
 print(complex_query)
 
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + complex_query)
+analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + long_query)
 
 actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
 print("Full Result:")

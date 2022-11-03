@@ -156,7 +156,8 @@ class PreProcessor:
 
     def collapse_from_last_comma(self, decomposed_query, last_comma_index, last_keyword_token: token.SQLToken, tokens, i):
         if last_comma_index is not None and last_comma_index != i:
-            decomposed_query[last_keyword_token.value].append("".join([t.value.lower() for t in tokens[last_comma_index + 1: i]]))
+            token_lst = [self.replace_alias_with_expression(decomposed_query, self.prepend_table_name_to_column(t)).value.lower() for t in tokens[last_comma_index + 1: i]]
+            decomposed_query[last_keyword_token.value].append("".join(token_lst))
         return decomposed_query, last_comma_index
 
     def extract_keywords(self, tokens, decomposed_query, parenthesis_level=0, subquery_alias=None):
@@ -164,10 +165,20 @@ class PreProcessor:
         last_keyword_token.parenthesis_level = parenthesis_level
         last_comma_index = None
         i = 0
+        semicolon_present = False
         while i < len(tokens):
             t: token.SQLToken = self.prepend_table_name_to_column(tokens[i])
             t = self.replace_alias_with_expression(decomposed_query, t)
             print("Value: " + str(t.value))
+            if (t.value.lower() == ";"):
+                semicolon_present = False
+                decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
+                last_comma_index = i
+                print("Done processing the query!")
+                i += 1
+                print(decomposed_query)
+                continue
+
             if (t.value == ","):
                 decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
                 last_comma_index = i
@@ -177,14 +188,25 @@ class PreProcessor:
   
                 # print(t.parenthesis_level)
                 # print(last_keyword_token.parenthesis_level)
+
+                # new keyword in same level query
                 if (t.parenthesis_level == last_keyword_token.parenthesis_level):
-                    if (t.value.lower() != "as"):
-                        decomposed_query[t.value] = []
-                        last_keyword_token = t
-                        last_comma_index = i
+                    
+                    if (t.value.lower() == "asc" or t.value.lower() == 'desc'):
+                        print("Reached desc/asc")
+                        decomposed_query["order by"].append(t.value.lower())
+                        print(decomposed_query)
+                        i += 1
+                        continue
 
                     if (t.value.lower() == "as"):
                         decomposed_query, i, last_comma_index = self.handle_as_keyword(decomposed_query, tokens, t, i, last_keyword_token, last_comma_index)
+                        i += 1
+                        continue
+
+                    decomposed_query[t.value] = []
+                    last_keyword_token = t
+                    last_comma_index = i
                     
                     if (t.value.lower() == "where" or t.value.lower() == "having"):
                         clause = t.value.lower()
@@ -192,7 +214,7 @@ class PreProcessor:
                         i += 1
                         t = tokens[i]
                         # a new keyword besides "and" or "or" marks the end of a group of where clauses
-                        while ((not t.is_keyword) or (t.parenthesis_level > last_keyword_token.parenthesis_level) or (t.value.lower() in ["and", "or", "not"])):
+                        while ((not t.is_keyword) or (t.parenthesis_level > last_keyword_token.parenthesis_level) or (t.value.lower() in ["and", "or", "not", "date"])):
                             where_tokens.append(t)
                             i += 1
                             if i < len(tokens):
@@ -205,9 +227,7 @@ class PreProcessor:
                             print("Value: " + str(tok.value))
                         print("End of " + clause + " tokens")
                         decomposed_query = self.extract_where(decomposed_query, where_tokens, tokens, i, [], last_keyword_token)
-                        last_comma_index = i + 1
-
-
+                        last_comma_index = i + 1                                                
 
                 # subquery
                 else:
@@ -237,8 +257,14 @@ class PreProcessor:
             #     decomposed_query[last_keyword_token.value].append(t.value)
             
             i += 1
-        decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
-        last_comma_index = i
+        if (not semicolon_present):
+            decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
+            last_comma_index = i
+
+        if ("order by" in decomposed_query):
+            if (decomposed_query["order by"][-1] not in ["asc", "desc"]):
+                decomposed_query["order by"].append("asc")
+
         return decomposed_query
 
 
@@ -264,20 +290,24 @@ if __name__ == "__main__":
                 select
                     sum(ps_supplycost * ps_availqty) * 0.0001000000
                 from
-                    partsupp,
-                    supplier,
-                    nation
+                    partsupp P,
+                    supplier S,
+                    nation N
                 where
                     ps_suppkey = s_suppkey
                     and s_nationkey = n_nationkey
                     and n_name = 'GERMANY'
-                ) as T
+                ) 
             order by
-            value desc;
+            value;
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
     preprocessor = PreProcessor(long_query)
     print(preprocessor.tables)
     print(preprocessor.columns)
     print(preprocessor.decomposed_query)
+    print(preprocessor.parser.columns_aliases_dict)
+    print(preprocessor.parser.columns_aliases_names)
+    print(preprocessor.parser.columns_aliases)
+    print(preprocessor.parser.tables_aliases)
     # print(preprocessor.query)
