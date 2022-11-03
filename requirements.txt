@@ -3,3 +3,5 @@ pandas
 python-dotenv
 sqlparse
 sql-metadata
+dash
+dash_bootstrap_components
