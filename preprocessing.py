@@ -12,7 +12,7 @@ class PreProcessor:
         self.tokens = self.parser.tokens
         self.tables = self.parser.tables
         self.get_metadata()
-        self.columns = self.get_columns()
+        self.parser_columns, self.columns = self.get_columns()
         self.column_to_table_mapping = self.get_column_to_table_mapping()
         self.not_transformations = {
             "<": ">=",
@@ -26,7 +26,7 @@ class PreProcessor:
         self.curr_subquery_num = 0
         self.tables_aliases = self.parser.tables_aliases
         self.aggregate_list = ["count", "sum", "avg", "approx_count_distinct", "max", "min", "stdev", "stdevp", "var", "varp", "string_agg"]
-        self.decomposed_query = self.extract_keywords(self.tokens, {"subqueries": {}})
+        self.decomposed_query, self.query_components = self.extract_keywords(self.tokens, {"subqueries": {}}, {"subqueries": {}})
 
     def clean(self, query_split):
         reconstructed_query = ""
@@ -67,19 +67,27 @@ class PreProcessor:
 
     # TODO: Complete the logic to map columns to tables
     def get_columns(self):
-        return self.parser.columns
+        return self.parser.columns, [column[column.find(".") + 1:] if column.find(".") != -1 else column for column in self.parser.columns ]
         # logic to assign each set of columns to each table dynamically, by querying the DB for table info
     
     def get_column_to_table_mapping(self):
-        query_columns = {column: self.all_column_names[column] for column in self.parser.columns}
+        query_columns = {column: self.all_column_names[column] for column in self.columns}
         return query_columns
 
-    def prepend_table_name_to_column(self, t: token.SQLToken):
+    def prepend_table_name_to_column(self, decomposed_query, t: token.SQLToken):
+        # table name already present
+        if "." in t.value.lower():
+            return t
+        # otherwise
         if t.value.lower() in self.columns:
             column_name = t.value.lower()
             t.value = self.column_to_table_mapping[t.value.lower()]
-            if (self.curr_subquery_num != 0):
-                t.value += "_" + str(self.curr_subquery_num)
+            old_val = t.value
+            print("Old value")
+            t = self.replace_alias_with_expression(decomposed_query, t)
+            if (t.value == old_val):
+                if (self.curr_subquery_num != 0):
+                    t.value += "_" + str(self.curr_subquery_num)
             t.value += "." + column_name
         return t
 
@@ -87,15 +95,31 @@ class PreProcessor:
         for t in self.tokens:
             self.print_token_debug_info(t)
 
-    def handle_as_keyword(self, decomposed_query, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
+    def handle_as_keyword(self, decomposed_query, curr_component, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
         if t.value not in decomposed_query:
             decomposed_query[t.value] = {}
         aggregate = decomposed_query[last_keyword_token.value][-1]
         i += 1
         alias = tokens[i]
+        curr_component.append(alias.value)
         decomposed_query[t.value][alias.value] = aggregate
         last_comma_index = i + 1
-        return decomposed_query, i, last_comma_index
+        return decomposed_query, i, last_comma_index, curr_component
+
+    def handle_table_name(self, decomposed_query, tokens, t:token.SQLToken, i, last_keyword_token, last_comma_index):
+        if (t in self.tables):
+            table = t
+            decomposed_query[last_keyword_token.value].append(table.value.lower())
+            # alias cases
+            i += 1
+            t = tokens[i]
+
+            # case 1: explicit 'as' keyword
+            if t.is_as_keyword():
+                decomposed_query, i, last_comma_index = self.handle_as_keyword(decomposed_query, tokens, t, i, last_keyword_token, last_comma_index)
+            
+            # case 2: no 'as' keyword
+            # if not t.is_dot and not t.is_:        
 
     def replace_alias_with_expression(self, decomposed_query, t: token.SQLToken):
         if "as" not in decomposed_query:
@@ -104,7 +128,7 @@ class PreProcessor:
             t.value = decomposed_query["as"][t.value]
         return t
 
-    def extract_where(self, decomposed_query, clause_tokens, tokens, overall_index, clause_list: list, last_keyword_token: token.SQLToken):
+    def extract_where(self, decomposed_query, query_components, clause_tokens, tokens, overall_index, clause_list: list, last_keyword_token: token.SQLToken):
         i = 0
         last_index = i
         curr_clause_not = False
@@ -112,8 +136,13 @@ class PreProcessor:
         subquery_start_index = None
         subquery_alias = None
         query_segment = (" ".join([t.value for t in clause_tokens]))[:-1]
+        raw_clause_lst = []
+        raw_tok_lst = []
+        raw_clause = ""
         while i < len(clause_tokens):
-            t: token.SQLToken = self.prepend_table_name_to_column(clause_tokens[i])
+            t: token.SQLToken = clause_tokens[i]
+            raw_tok_lst.append(t.value)
+            t: token.SQLToken = self.prepend_table_name_to_column(decomposed_query, t)
             t = self.replace_alias_with_expression(decomposed_query, t)
             print("Value: " + str(t.value))
             if (t.value.lower() == "date"):
@@ -123,14 +152,18 @@ class PreProcessor:
                 contains_subquery = True
                 subquery_start_index = i
                 self.curr_subquery_num += 1
-                decomposed_query, i, subquery_alias = self.extract_subquery(decomposed_query, clause_tokens, i, last_keyword_token, t)
+                decomposed_query, query_components, i, subquery_alias = self.extract_subquery(decomposed_query, query_components, clause_tokens, i, last_keyword_token, t)
                 print("Subquery alias: " + subquery_alias)
             if t.is_keyword and (t.value.lower() == "and" or t.value.lower() == "or"):
                 if not contains_subquery:
                     tok_lst = [tok.value for tok in clause_tokens[last_index: i]]
+                    raw_clause += " ".join(raw_tok_lst)
+                    raw_tok_lst = []
                 else:
                     print("reached this case")
                     tok_lst = [tok.value for tok in clause_tokens[last_index: subquery_start_index - 1]] + [subquery_alias]
+                    raw_clause += " ".join(raw_tok_lst[:-2]) + subquery_alias
+                    raw_tok_lst = []
                     contains_subquery = False
                     subquery_start_index = None
                     subquery_alias = None
@@ -141,16 +174,23 @@ class PreProcessor:
                     tok_lst[1] = self.not_transformations[tok_lst[1].lower()]
                     curr_clause_not = False
                 # print(tok_lst)
+                raw_clause_lst.append(raw_clause)
+                raw_clause = ""
                 clause_list.append(" ".join(tok_lst))
                 last_index = i + 1
             elif (t.is_keyword and t.value.lower() == "not"):
+                # raw_clause += t.value + " "
                 curr_clause_not = True
                 last_index = i + 1
             i += 1
         if not contains_subquery:
             tok_lst = [tok.value for tok in clause_tokens[last_index: i]]
+            print("Raw token list")
+            print(raw_tok_lst)
+            raw_clause = " ".join(raw_tok_lst)
         else:
             tok_lst = [tok.value for tok in clause_tokens[last_index: subquery_start_index - 1]] + [subquery_alias]
+            raw_clause = " ".join(raw_tok_lst[:-2]) + subquery_alias
             contains_subquery = False
             subquery_start_index = None
         print(tok_lst)
@@ -159,11 +199,14 @@ class PreProcessor:
             tok_lst[1] = self.not_transformations[tok_lst[1].lower()]
             curr_clause_not = False
         print(tok_lst)
+        raw_clause_lst.append(raw_clause)
         clause_list.append(" ".join(tok_lst))
         decomposed_query[last_keyword_token.value] = clause_list
-        return decomposed_query
+        print("final raw tokens")
+        print(raw_clause_lst)
+        return decomposed_query, raw_clause_lst
 
-    def extract_subquery(self, decomposed_query, tokens, i, last_keyword_token: token.SQLToken, t: token.SQLToken):
+    def extract_subquery(self, decomposed_query, query_components, tokens, i, last_keyword_token: token.SQLToken, t: token.SQLToken):
         subquery_tokens = []
         # a ')' with same parenthesis level as parent query marks end of subquery
         while t.value != ")" or t.parenthesis_level != last_keyword_token.parenthesis_level: 
@@ -175,29 +218,32 @@ class PreProcessor:
             print("Value: " + tok.value)
         print("End of subquery tokens")
         subquery_alias = "sub_number_" + str(self.curr_subquery_num)
-        decomposed_query["subqueries"][subquery_alias] = (self.extract_keywords(subquery_tokens[:-1], {"subqueries": {}}, t.parenthesis_level + 1))
-        return decomposed_query, i, subquery_alias
+        decomposed_query["subqueries"][subquery_alias], query_components["subqueries"][subquery_alias] = (self.extract_keywords(subquery_tokens[:-1], {"subqueries": {}}, {"subqueries": {}}, t.parenthesis_level + 1))
+        return decomposed_query, query_components, i, subquery_alias
 
     def collapse_from_last_comma(self, decomposed_query, last_comma_index, last_keyword_token: token.SQLToken, tokens, i):
         if last_comma_index is not None and last_comma_index != i:
-            token_lst = [self.replace_alias_with_expression(decomposed_query, self.prepend_table_name_to_column(t)).value.lower() for t in tokens[last_comma_index + 1: i]]
+            token_lst = [self.replace_alias_with_expression(decomposed_query, self.prepend_table_name_to_column(decomposed_query, t)).value.lower() for t in tokens[last_comma_index + 1: i]]
             decomposed_query[last_keyword_token.value].append("".join(token_lst))
         return decomposed_query, last_comma_index
 
-    def extract_keywords(self, tokens, decomposed_query, parenthesis_level=0, subquery_alias=None):
+    def extract_keywords(self, tokens, decomposed_query, query_components, parenthesis_level=0, subquery_alias=None):
         last_keyword_token = token.SQLToken()
         last_keyword_token.parenthesis_level = parenthesis_level
         last_comma_index = None
         i = 0
         semicolon_present = False
+        curr_component = []
         while i < len(tokens):
             t: token.SQLToken = tokens[i]
-            t = self.prepend_table_name_to_column(t)
+            curr_component.append(t.value)
+            t = self.prepend_table_name_to_column(decomposed_query, t)
             t = self.replace_alias_with_expression(decomposed_query, t)
             print("Value: " + str(t.value))
             if (t.value.lower() == ";"):
-                semicolon_present = False
+                semicolon_present = True
                 decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
+                query_components[last_keyword_token.value] = " ".join(curr_component)
                 last_comma_index = i
                 print("Done processing the query!")
                 i += 1
@@ -219,25 +265,32 @@ class PreProcessor:
                     if (t.value.lower() == "asc" or t.value.lower() == 'desc'):
                         print("Reached desc/asc")
                         decomposed_query["order by"].append(t.value.lower())
-                        print(decomposed_query)
+                        if (last_keyword_token is not None):
+                            query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
+                        # print(decomposed_query)
                         i += 1
                         continue
 
                     if (t.value.lower() == "as"):
-                        decomposed_query, i, last_comma_index = self.handle_as_keyword(decomposed_query, tokens, t, i, last_keyword_token, last_comma_index)
+                        decomposed_query, i, last_comma_index, curr_component = self.handle_as_keyword(decomposed_query, curr_component, tokens, t, i, last_keyword_token, last_comma_index)
                         i += 1
                         continue
 
                     decomposed_query[t.value] = []
+                    query_components[t.value] = []
+                    if (last_keyword_token is not None):
+                        query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
+                    curr_component = curr_component[-1:]
                     last_keyword_token = t
                     last_comma_index = i
+
                     
                     if (t.value.lower() == "where" or t.value.lower() == "having"):
                         clause = t.value.lower()
                         where_tokens = []
                         i += 1
                         t = tokens[i]
-                        # a new keyword besides "and" or "or" marks the end of a group of where clauses
+                        # a new keyword besides "and", "or", "not" or "date" marks the end of a group of where clauses
                         while ((not t.is_keyword) or (t.parenthesis_level > last_keyword_token.parenthesis_level) or (t.value.lower() in ["and", "or", "not", "date"])):
                             where_tokens.append(t)
                             i += 1
@@ -250,17 +303,26 @@ class PreProcessor:
                         for tok in where_tokens:
                             print("Value: " + str(tok.value))
                         print("End of " + clause + " tokens")
-                        decomposed_query = self.extract_where(decomposed_query, where_tokens, tokens, i, [], last_keyword_token)
+                        decomposed_query, clause_list = self.extract_where(decomposed_query, query_components, where_tokens, tokens, i, [], last_keyword_token)
+                        curr_component.extend(clause_list)
                         last_comma_index = i + 1                                                
 
                 # subquery
                 else:
                     print("Reached subquery case")
                     self.curr_subquery_num += 1
-                    decomposed_query, i, subquery_alias = self.extract_subquery(decomposed_query, tokens, i, last_keyword_token, t)
-            print([key.lower() for key in self.tables_aliases])
+                    decomposed_query, query_components, i, subquery_alias = self.extract_subquery(decomposed_query, query_components, tokens, i, last_keyword_token, t)
+
+            # reached a table alias; then add it to as mapping and remove
             if (t.value in self.tables_aliases):
                 print("reached table alias")
+                prev_token: token.SQLToken = tokens[i - 1]
+                if (prev_token.is_as_keyword):
+                    prev_token = tokens[i - 2]
+                
+                if "as" not in decomposed_query:
+                    decomposed_query["as"] = {}
+                decomposed_query["as"][prev_token.value.lower()] = t.value
                 tokens.pop(i)
                 continue
             # aggregates
@@ -288,26 +350,28 @@ class PreProcessor:
         if (not semicolon_present):
             decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
             last_comma_index = i
+            if (last_keyword_token is not None):
+                query_components[last_keyword_token.value] = " ".join(curr_component)
 
         if ("order by" in decomposed_query):
             if (decomposed_query["order by"][-1] not in ["asc", "desc"]):
                 decomposed_query["order by"].append("asc")
 
-        return decomposed_query
+        return decomposed_query, query_components
 
 
 if __name__ == "__main__":
     complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by sum_disc_price, l_linestatus order by sum_disc_price, l_linestatus"
     long_query = """
         select
-            ps_partkey,
+            ps_partkey PS,
             sum(ps_supplycost * ps_availqty) as value
             from
             partsupp P,
             supplier,
             nation
             where
-            ps_suppkey = s_suppkey
+            PS.ps_suppkey = s_suppkey
             and not s_nationkey = n_nationkey
             and n_name = 'GERMANY'
             and ps_supplycost > 20
@@ -335,6 +399,7 @@ if __name__ == "__main__":
     print(preprocessor.tables)
     print(preprocessor.columns)
     print(preprocessor.decomposed_query)
+    print(preprocessor.query_components)
     print(preprocessor.parser.columns_aliases_dict)
     print(preprocessor.parser.columns_aliases_names)
     print(preprocessor.parser.columns_aliases)
