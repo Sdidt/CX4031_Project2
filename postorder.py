@@ -64,6 +64,11 @@ analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT 
 
 dct = analyze_fetched[0][0][0]["Plan"]
 
+from_count = query.count("from", 0, len(query))
+# since total "FROM" count is 2, possibilities are NATION and NATION_1
+# assuming the deeper it goes, the higher the number at the back
+current_count = from_count - 1
+prev_seq_scan = False
 
 class Node():
     def __init__(self, data: dict) -> None:
@@ -87,6 +92,8 @@ class Node():
         self.parent.append(parent)
 
     def mapping(self):
+        global current_count
+        global prev_seq_scan
 
         keywords = {}
 
@@ -99,7 +106,7 @@ class Node():
         elif self.type == "Materialize":
             pass
         elif self.type == "Nested Loop":
-            pass
+            keywords = self.node_nested_loop()
         elif self.type == "Aggregate":
             keywords = self.node_aggregate()
         elif self.type == "Sort":
@@ -109,32 +116,72 @@ class Node():
         else:
             pass
     
+        # switch flag to decrement current count
+        if self.type != "Seq Scan" and prev_seq_scan:
+            current_count = current_count - 1
+            prev_seq_scan = False
+
         # converting dictionary to a list of dictionaries
         lst = []
         for key,value in keywords.items():
             dct = {}
             dct[key] = value
             lst.append(dct)
+
+        if isinstance(self.parent[0], NoneType):
+            dct = {}
+            dct["SELECT"] = self.information["Output"]
+            lst.append(dct)
+
         return lst
+
+    def node_nested_loop(self):
+        relevant_info = {}
+        if "Join Filter" in self.information:
+            relevant_info["WHERE"] = self.information["Join Filter"]
+
+        return relevant_info
 
     def node_aggregate(self):
         relevant_info = {}
         if 'Group Key' in self.information:
             group = self.information["Group Key"]
             relevant_info["GROUP BY"] = group
+
+        output = self.information["Output"]
+        for each in output:
+            if "sum" in each:
+                relevant_info["SUM"] = each.split("sum",1)[1]
+            # below all not tested yet 
+            if "max" in each:
+                relevant_info["MAX"] = each.split("max",1)[1]
+            if "count" in each:
+                relevant_info["COUNT"] = each.split("count",1)[1]
+            if "min" in each:
+                relevant_info["MIN"] = each.split("min",1)[1]
+            if "avg" in each:
+                relevant_info["AVG"]= each.split("avg",1)[1]
+
+        # still need tackle words like UNION and SELECT DISTINCT
+
         return relevant_info
 
     def node_sort(self):
+
         relevant_info = {}
         order = "DESC" if self.information["Sort Key"][0][-4:] == "DESC" else "ASC"
-        relevant_info["ORDER BY"] = order
-    
+        key = self.information["Sort Key"][0] if order == "ASC" else self.information["Sort Key"][0][:-5]
+        relevant_info["ORDER BY"] = [order, key]
+
         return relevant_info
     
     def node_seq_scan(self):
+        global current_count
+        global prev_seq_scan
+
         relevant_info = {}
         relation = self.information.get("Relation Name")
-        relevant_info["FROM"] = relation
+        relevant_info["FROM"] = relation + "_{}".format(current_count) if current_count != 0 else relation       
 
         if "Filter" in self.information:
             filter = self.information.get("Filter")
@@ -148,13 +195,15 @@ class Node():
                 relevant_info["WHERE"] = filter1
                 relevant_info["IN"] = filter2
         
-        alias = self.information.get("Alias")
-        if len(alias) > len(relation):
-            # confirm that is subquery, now need to know the level
-            level = int(alias[-1])
-            relevant_info["level"] = level
-        else:
-            relevant_info["level"] = 0
+        # alias = self.information.get("Alias")
+        # if len(alias) > len(relation):
+        #     # confirm that is subquery, now need to know the level
+        #     level = int(alias[-1])
+        #     relevant_info["level"] = level
+        # else:
+        #     relevant_info["level"] = 0
+
+        prev_seq_scan = True
 
         return relevant_info
 
@@ -169,8 +218,6 @@ class Node():
         
         return relevant_info
     
-
-
 
 def capture_nodes(dct, parent):
 
