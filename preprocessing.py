@@ -71,7 +71,7 @@ class PreProcessor:
         # logic to assign each set of columns to each table dynamically, by querying the DB for table info
     
     def get_column_to_table_mapping(self):
-        query_columns = {column: self.all_column_names[column] for column in self.columns}
+        query_columns = {column: self.all_column_names[column] if column != '*' else column for column in self.columns}
         return query_columns
 
     def prepend_table_name_to_column(self, decomposed_query, t: token.SQLToken):
@@ -394,7 +394,7 @@ if __name__ == "__main__":
             value;
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
-    preprocessor = PreProcessor(long_query)
+    preprocessor = PreProcessor(sql_query)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)
@@ -406,3 +406,6 @@ if __name__ == "__main__":
     print(preprocessor.parser.tables_aliases)
     print(preprocessor.tables)
     # print(preprocessor.query)
+
+
+# from decomposed query has aliases due to the table name to alias mapping in as dictionary and working collapse form last comma. 

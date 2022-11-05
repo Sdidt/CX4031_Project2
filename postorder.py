@@ -145,7 +145,7 @@ class Node():
     
     def node_seq_scan(self):
         relevant_info = {}
-        relation = self.information.get("Relation Name")
+        relation = self.information.get("Alias")
         relevant_info["FROM"] = relation
 
         if "Filter" in self.information:
