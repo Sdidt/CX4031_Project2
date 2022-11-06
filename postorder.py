@@ -77,7 +77,9 @@ dct = analyze_fetched[0][0][0]["Plan"]
 
 
 class Node():
+
     def __init__(self, data: dict, subquery_level) -> None:
+
         self.type = data.get("Node Type")
         self.subquery_level = subquery_level
         self.parent = []
@@ -129,22 +131,31 @@ class Node():
             lst.append(dct)
         return lst
 
+    def remove_punctuations(self, condition):
+        split_condition = condition.split("::", 1)
+        if len(split_condition) == 1:
+            split_condition = split_condition[0][1:-1]
+        else:
+            split_condition = split_condition[0][1:]
+        return split_condition
+
     def node_aggregate(self):
         relevant_info = {}
         if 'Group Key' in self.information:
             group = self.information["Group Key"]
-            relevant_info["GROUP BY"] = group
+            relevant_info["group by"] = group
         return relevant_info
 
     def node_sort(self):
         relevant_info = {}
         order = "desc" if self.information["Sort Key"][0][-4:] == "desc" else "asc"
         key = self.information["Sort Key"][0] if order == "asc" else self.information["Sort Key"][0][:-5]
-        key = key.split("::", 1)[0][1:]
+        key = self.remove_punctuations(key)
         relevant_info["order by"] = [key, order]
     
         return relevant_info
     
+    # complete
     def node_seq_scan(self):
         relevant_info = {}
         relation = self.information.get("Alias")
@@ -154,7 +165,7 @@ class Node():
             filter = self.information.get("Filter")
 
             if "= any" not in filter:
-                filter = filter.split("::", 1)[0][1:]
+                filter = self.remove_punctuations(filter)                
                 relevant_info["where"] = filter
             else:
                 filter1 = filter.split(" = any", 1)[0][1:]
@@ -169,32 +180,38 @@ class Node():
         #     relevant_info["level"] = level
         # else:
         #     relevant_info["level"] = 0
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
+    # complete
     def node_hash(self):
         relevant_info = {}
         return relevant_info
 
+    # complete
     def node_hash_join(self):
         relevant_info = {}
         condition = self.information['Hash Cond'][1:-1]
-        keyword = "where"
-        relevant_info[keyword] = condition
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict, condition)
+        keywords = ["where", "in"]
+        for keyword in keywords:
+            relevant_info[keyword] = condition
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
         
         return relevant_info
     
     def node_nested_loop(self):
         relevant_info = {}
         condition = self.information['Join Filter'][1:-1]
-        keyword = "where"
-        relevant_info[keyword] = condition
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict, condition)
+        keywords = ["where", "in"]
+        for keyword in keywords:
+            relevant_info[keyword] = condition
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
-    def find_match_in_decomposed_query(self, relevant_info, decomposed_query, query_component_dict, condition):
+    def find_match_in_decomposed_query(self, relevant_info, decomposed_query, query_component_dict):
+        conditions = []
         original_query_components = []
         i = 0
         relevant_decomposed_query = decomposed_query
@@ -204,20 +221,23 @@ class Node():
             relevant_query_component = relevant_query_component["subqueries"]["sub_number_" + str(i + 1)]
             i += 1
         for k, v in relevant_info.items():
-            original_query_component = relevant_query_component[k]
+            original_query_component = relevant_query_component.get(k, None)
+            if original_query_component is None:
+                continue
+            conditions.append(k + v)
             original_query_components.append(original_query_component)
-            print("blahblahblah")
             similarity_score = 0
             for clause in relevant_decomposed_query[k]:
-                print(clause)
+                print("Testing clause for match : {}".format(clause))
                 curr_score = SequenceMatcher(None, clause, v).ratio()
                 if similarity_score < curr_score:
                     similarity_score = curr_score
-                print(curr_score)
+                print("Similarity Score: {}".format(curr_score))
             if similarity_score > 0.65:
                 print("Fairly good match is found")
         print(original_query_components)
-        print("The condition " + condition + " is implemented using hash join because ...")
+        for condition in conditions:
+            print("The clause " + condition + " is implemented using " + self.type + " because ...")
 
 
 
