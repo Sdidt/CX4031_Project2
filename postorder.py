@@ -10,12 +10,20 @@ db = DB()
 
 
 decomposed_query = {
-    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': ['sum(partsupp_1.ps_supplycost*partsupp_1.ps_availqty)*0.0001000000'], 'from': ['p1', 's', 'nation'], 'as': {'partsupp': 'p1', 'supplier': 's'}, 'where': ['p1.ps_suppkey = s.s_suppkey', 's.s_nationkey = nation_1.n_nationkey', "nation_1.n_name = 'GERMANY'"]}}, 'select': ['partsupp.ps_partkeyps', 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)'], 'as': {'value': 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'partsupp': 'p'}, 'from': ['p', 'supplier', 'nation'], 'where': ['P.ps_suppkey = supplier.s_suppkey', 'supplier.s_nationkey <> nation.n_nationkey', "nation.n_name = 'GERMANY'", 'p.ps_supplycost > 20', 'supplier.s_acctbal > 10'], 'group by': ['p.ps_partkey'], 'having': ['sum ( p.ps_supplycost * p.ps_availqty ) > sub_number_1'], 'order by': ['sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'asc']
+    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': ['sum(partsupp_1.ps_supplycost*partsupp_1.ps_availqty)*0.0001000000'], 'from': ['p1', 's', 'nation'], 'as': {'partsupp': 'p1', 'supplier': 's'}, 'where': ['p1.ps_suppkey = s.s_suppkey', 's.s_nationkey = nation_1.n_nationkey', "nation_1.n_name = 'GERMANY'"]}}, 'select': ['partsupp.ps_partkeyps', 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)'], 'as': {'value': 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'partsupp': 'p'}, 'from': ['p', 'supplier', 'nation'], 'where': ['P.ps_suppkey = supplier.s_suppkey', 'supplier.s_nationkey <> nation.n_nationkey', "nation.n_name = 'GERMANY'", 'p.ps_supplycost > 20', 'supplier.s_acctbal > 10'], 'group by': ['p.ps_partkey'], 'having': ['sum ( p.ps_supplycost * p.ps_availqty ) > sub_number_1'], 'order by': ['sum(partsupp.ps_supplycost*partsupp.ps_availqty) asc']
 }
 
 query_component_dict = {
     'subqueries': {'sub_number_1': {'subqueries': {}, 'select': 'select sum ( ps_supplycost * ps_availqty ) * 0.0001000000', '': '', 'from': 'from partsupp P1 , supplier S , nation', 'where': "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'"}}, 'select': 'select ps_partkey PS , sum ( ps_supplycost * ps_availqty ) as value', '': '', 'from': 'from partsupp P , supplier , nation', 'where': "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10", 'group by': 'group by ps_partkey', 'having': 'having sum ( ps_supplycost * ps_availqty ) >sub_number_1', 'order by': 'order by value ;'
     }
+
+decomposed_query ={
+    'subqueries': {}, 'select': ['*.*'], 'from': ['nation'], 'where': ['nation.n_nationkey = 3 ;']
+}
+
+query_component_dict = {
+    'subqueries': {}, 'select': 'select *', '': '', 'from': 'from nation', 'where': 'where nation.n_nationkey = 3 ;'
+}
 
 
 query = """
@@ -50,6 +58,8 @@ select
             value;
 """
 
+primary_key_query = "select * from nation where nation.n_nationkey = 3;"
+
 # query = """
 # select
 #       ps_partkey
@@ -70,8 +80,11 @@ select
 #       s_nationkey in (select n_nationkey from nation)
 #    ;
 # """
+# lst_enable_disable = ["set enable_indexscan = false", "set enable_bitmapscan = false"]
+db.execute("set enable_indexscan = false")
+# db.execute("set enable_bitmapscan = false")
 
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)
+analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + primary_key_query)
 
 dct = analyze_fetched[0][0][0]["Plan"]
 
@@ -93,6 +106,8 @@ class Node():
             d.pop("Plans")
 
         self.information = d
+        if (self.type == "Sort"):
+            self.type = self.information["Sort Method"] + " Sort"
 
     def add_child(self, child: Node) -> None:
         self.children.append(child)
@@ -106,6 +121,12 @@ class Node():
 
         if self.type == "Seq Scan":
             keywords = self.node_seq_scan()
+        elif self.type == "Index Scan":
+            keywords = self.node_index_scan()
+        elif self.type == "Bitmap Index Scan":
+            keywords = self.node_bitmap_index_scan()
+        elif self.type == "Bitmap Heap Scan":
+            keywords = self.node_bitmap_heap_scan()
         elif self.type == "Hash":
             keywords = self.node_hash()
         elif self.type == "Hash Join":
@@ -116,7 +137,7 @@ class Node():
             keywords = self.node_nested_loop()
         elif self.type == "Aggregate":
             keywords = self.node_aggregate()
-        elif self.type == "Sort":
+        elif "Sort" in self.type:
             keywords = self.node_sort()
         elif self.type == "Gather Merge":
             pass
@@ -146,13 +167,15 @@ class Node():
             relevant_info["group by"] = group
         return relevant_info
 
+    # complete: BUT need to handle case when sort is used before sort merge join
     def node_sort(self):
         relevant_info = {}
         order = "desc" if self.information["Sort Key"][0][-4:] == "desc" else "asc"
         key = self.information["Sort Key"][0] if order == "asc" else self.information["Sort Key"][0][:-5]
         key = self.remove_punctuations(key)
-        relevant_info["order by"] = [key, order]
+        relevant_info["order by"] = key + " " + order
     
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
         return relevant_info
     
     # complete
@@ -185,6 +208,56 @@ class Node():
         return relevant_info
 
     # complete
+    def node_index_scan(self):
+        relevant_info = {}
+        relation = self.information.get("Alias")
+        relevant_info["from"] = relation
+
+        if "Index Cond" in self.information:
+            index_cond = self.information.get("Index Cond")
+
+            if "= any" not in index_cond:
+                index_cond = self.remove_punctuations(index_cond)                
+                relevant_info["where"] = index_cond
+            else:
+                index_cond1 = index_cond.split(" = any", 1)[0][1:]
+                index_cond2 = index_cond.split("any (", 1)[1].split("::", 1)[0]
+                relevant_info["where"] = index_cond1
+                relevant_info["in"] = index_cond2
+
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
+
+        return relevant_info
+
+    def node_bitmap_index_scan(self):
+        relevant_info = {}
+    
+        if "Index Cond" in self.information:
+            index_cond = self.information.get("Index Cond")
+
+            if "= any" not in index_cond:
+                index_cond = self.remove_punctuations(index_cond)                
+                relevant_info["where"] = index_cond
+            else:
+                index_cond1 = index_cond.split(" = any", 1)[0][1:]
+                index_cond2 = index_cond.split("any (", 1)[1].split("::", 1)[0]
+                relevant_info["where"] = index_cond1
+                relevant_info["in"] = index_cond2
+
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
+
+        return relevant_info
+
+    def node_bitmap_heap_scan(self):
+        relevant_info = {}
+        relation = self.information.get("Alias")
+        relevant_info["from"] = relation
+
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
+
+        return relevant_info
+
+    # complete
     def node_hash(self):
         relevant_info = {}
         return relevant_info
@@ -200,6 +273,7 @@ class Node():
         
         return relevant_info
     
+    # complete
     def node_nested_loop(self):
         relevant_info = {}
         condition = self.information['Join Filter'][1:-1]
@@ -224,7 +298,10 @@ class Node():
             original_query_component = relevant_query_component.get(k, None)
             if original_query_component is None:
                 continue
-            conditions.append(k + v)
+            if isinstance(v, list):
+                conditions.append("\"" + k + " " + " ".join(v) + "\"")
+            else:
+                conditions.append("\"" + k + " " + v + "\"")
             original_query_components.append(original_query_component)
             similarity_score = 0
             for clause in relevant_decomposed_query[k]:

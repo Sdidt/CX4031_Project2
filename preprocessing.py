@@ -266,7 +266,7 @@ class PreProcessor:
                     
                     if (t.value.lower() == "asc" or t.value.lower() == 'desc'):
                         print("Reached desc/asc")
-                        decomposed_query["order by"].append(t.value.lower())
+                        decomposed_query["order by"][-1] += " " + t.value.lower()
                         if (last_keyword_token is not None):
                             query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
                         # print(decomposed_query)
@@ -365,7 +365,7 @@ class PreProcessor:
 
         if ("order by" in decomposed_query):
             if (decomposed_query["order by"][-1] not in ["asc", "desc"]):
-                decomposed_query["order by"].append("asc")
+                decomposed_query["order by"][-1] += " asc"
 
         return decomposed_query, query_components
 
@@ -404,7 +404,8 @@ if __name__ == "__main__":
             value;
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
-    preprocessor = PreProcessor(long_query)
+    primary_key_query = "select * from nation where nation.n_nationkey = 3;"
+    preprocessor = PreProcessor(primary_key_query)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)

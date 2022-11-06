@@ -11,7 +11,11 @@ class DB:
     
     def execute(self, query):
         self.cursor.execute(query)
-        query_results = self.cursor.fetchall()
+        query_results = None
+        try:
+            query_results = self.cursor.fetchall()
+        except psycopg2.ProgrammingError:
+            print("No results to fetch")
         return query_results
     
     def close(self):
