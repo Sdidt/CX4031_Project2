@@ -10,44 +10,44 @@ db = DB()
 
 
 decomposed_query = {
-    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': ['sum(partsupp_1.ps_supplycost*partsupp_1.ps_availqty)*0.0001000000'], 'from': ['p1', 's', 'nation'], 'as': {'partsupp': 'P1', 'supplier': 'S'}, 'where': ['P1.ps_suppkey = S.s_suppkey', 'S.s_nationkey = nation_1.n_nationkey', "nation_1.n_name = 'GERMANY'"]}}, 'select': ['partsupp.ps_partkeyps', 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)'], 'as': {'value': 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'partsupp': 'P'}, 'from': ['p', 'supplier', 'nation'], 'where': ['PS.ps_suppkey = supplier.s_suppkey', 'supplier.s_nationkey <> nation.n_nationkey', "nation.n_name = 'GERMANY'", 'P.ps_supplycost > 20', 'supplier.s_acctbal > 10'], 'group by': ['p.ps_partkey'], 'having': ['sum ( P.ps_supplycost * P.ps_availqty ) > sub_number_1'], 'order by': ['sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'asc']
-    }
+    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': ['sum(partsupp_1.ps_supplycost*partsupp_1.ps_availqty)*0.0001000000'], 'from': ['p1', 's', 'nation'], 'as': {'partsupp': 'p1', 'supplier': 's'}, 'where': ['p1.ps_suppkey = s.s_suppkey', 's.s_nationkey = nation_1.n_nationkey', "nation_1.n_name = 'GERMANY'"]}}, 'select': ['partsupp.ps_partkeyps', 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)'], 'as': {'value': 'sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'partsupp': 'p'}, 'from': ['p', 'supplier', 'nation'], 'where': ['P.ps_suppkey = supplier.s_suppkey', 'supplier.s_nationkey <> nation.n_nationkey', "nation.n_name = 'GERMANY'", 'p.ps_supplycost > 20', 'supplier.s_acctbal > 10'], 'group by': ['p.ps_partkey'], 'having': ['sum ( p.ps_supplycost * p.ps_availqty ) > sub_number_1'], 'order by': ['sum(partsupp.ps_supplycost*partsupp.ps_availqty)', 'asc']
+}
 
 query_component_dict = {
-    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': 'select sum ( ps_supplycost * ps_availqty ) * 0.0001000000', '': '', 'from': 'from partsupp P1 , supplier S , nation', 'where': "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'"}}, 'select': 'select ps_partkey PS , sum ( ps_supplycost * ps_availqty ) as value', '': '', 'from': 'from partsupp P , supplier , nation', 'where': "where PS.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10", 'group by': 'group by ps_partkey', 'having': 'having sum ( ps_supplycost * ps_availqty ) >sub_number_1', 'order by': 'order by value ;'
+    'subqueries': {'sub_number_1': {'subqueries': {}, 'select': 'select sum ( ps_supplycost * ps_availqty ) * 0.0001000000', '': '', 'from': 'from partsupp P1 , supplier S , nation', 'where': "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'"}}, 'select': 'select ps_partkey PS , sum ( ps_supplycost * ps_availqty ) as value', '': '', 'from': 'from partsupp P , supplier , nation', 'where': "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10", 'group by': 'group by ps_partkey', 'having': 'having sum ( ps_supplycost * ps_availqty ) >sub_number_1', 'order by': 'order by value ;'
     }
 
 
 query = """
 select
-    ps_partkey PS,
-    sum(ps_supplycost * ps_availqty) as value
-    from
-    partsupp P,
-    supplier,
-    nation
-    where
-    P.ps_suppkey = s_suppkey
-    and not s_nationkey = n_nationkey
-    and n_name = 'GERMANY'
-    and ps_supplycost > 20
-    and s_acctbal > 10
-    group by
-    ps_partkey having
-        sum(ps_supplycost * ps_availqty) > (
-        select
-            sum(ps_supplycost * ps_availqty) * 0.0001000000
-        from
-            partsupp P1,
-            supplier S,
+            ps_partkey PS,
+            sum(ps_supplycost * ps_availqty) as value
+            from
+            partsupp P,
+            supplier,
             nation
-        where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey
+            where
+            P.ps_suppkey = s_suppkey
+            and not s_nationkey = n_nationkey
             and n_name = 'GERMANY'
-        ) 
-    order by
-    value;
+            and ps_supplycost > 20
+            and s_acctbal > 10
+            group by
+            ps_partkey having
+                sum(ps_supplycost * ps_availqty) > (
+                select
+                    sum(ps_supplycost * ps_availqty) * 0.0001000000
+                from
+                    partsupp P1,
+                    supplier S,
+                    nation
+                where
+                    ps_suppkey = s_suppkey
+                    and s_nationkey = n_nationkey
+                    and n_name = 'GERMANY'
+                ) 
+            order by
+            value;
 """
 
 # query = """
@@ -111,7 +111,7 @@ class Node():
         elif self.type == "Materialize":
             pass
         elif self.type == "Nested Loop":
-            pass
+            keywords = self.node_nested_loop()
         elif self.type == "Aggregate":
             keywords = self.node_aggregate()
         elif self.type == "Sort":
@@ -122,7 +122,7 @@ class Node():
             pass
     
         # converting dictionary to a list of dictionaries
-        lst = []
+        lst = [{"level": self.subquery_level}]
         for key,value in keywords.items():
             dct = {}
             dct[key] = value
@@ -138,35 +138,37 @@ class Node():
 
     def node_sort(self):
         relevant_info = {}
-        order = "DESC" if self.information["Sort Key"][0][-4:] == "DESC" else "ASC"
-        relevant_info["ORDER BY"] = order
+        order = "desc" if self.information["Sort Key"][0][-4:] == "desc" else "asc"
+        key = self.information["Sort Key"][0] if order == "asc" else self.information["Sort Key"][0][:-5]
+        key = key.split("::", 1)[0][1:]
+        relevant_info["order by"] = [key, order]
     
         return relevant_info
     
     def node_seq_scan(self):
         relevant_info = {}
         relation = self.information.get("Alias")
-        relevant_info["FROM"] = relation
+        relevant_info["from"] = relation
 
         if "Filter" in self.information:
             filter = self.information.get("Filter")
 
-            if "= ANY" not in filter:
+            if "= any" not in filter:
                 filter = filter.split("::", 1)[0][1:]
-                relevant_info["WHERE"] = filter
+                relevant_info["where"] = filter
             else:
-                filter1 = filter.split(" = ANY", 1)[0][1:]
-                filter2 = filter.split("ANY (", 1)[1].split("::", 1)[0]
-                relevant_info["WHERE"] = filter1
-                relevant_info["IN"] = filter2
+                filter1 = filter.split(" = any", 1)[0][1:]
+                filter2 = filter.split("any (", 1)[1].split("::", 1)[0]
+                relevant_info["where"] = filter1
+                relevant_info["in"] = filter2
         
-        alias = self.information.get("Alias")
-        if len(alias) > len(relation):
-            # confirm that is subquery, now need to know the level
-            level = int(alias[-1])
-            relevant_info["level"] = level
-        else:
-            relevant_info["level"] = 0
+        # alias = self.information.get("Alias")
+        # if len(alias) > len(relation):
+        #     # confirm that is subquery, now need to know the level
+        #     level = int(alias[-1])
+        #     relevant_info["level"] = level
+        # else:
+        #     relevant_info["level"] = 0
 
         return relevant_info
 
@@ -177,22 +179,45 @@ class Node():
     def node_hash_join(self):
         relevant_info = {}
         condition = self.information['Hash Cond'][1:-1]
-        relevant_info["where"] = condition
-        original_query_component = query_component_dict['where']
-        for k, v in relevant_info.items():
-            print("blahblahblah")
-            similarity_score = 0
-            for clause in decomposed_query[k]:
-                print(clause)
-                if similarity_score < SequenceMatcher(None, clause, v).ratio():
-                    similarity_score = SequenceMatcher(None, clause, v).ratio()
-                    print(similarity_score)
-            if similarity_score > 0.65:
-                print("Fairly good match is found")
-        print(original_query_component)
-        print("The condition " + condition + " is implemented using hash join because ...")
+        keyword = "where"
+        relevant_info[keyword] = condition
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict, condition)
+        
         return relevant_info
     
+    def node_nested_loop(self):
+        relevant_info = {}
+        condition = self.information['Join Filter'][1:-1]
+        keyword = "where"
+        relevant_info[keyword] = condition
+        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict, condition)
+
+        return relevant_info
+
+    def find_match_in_decomposed_query(self, relevant_info, decomposed_query, query_component_dict, condition):
+        original_query_components = []
+        i = 0
+        relevant_decomposed_query = decomposed_query
+        relevant_query_component = query_component_dict
+        while i < self.subquery_level:
+            relevant_decomposed_query = decomposed_query["subqueries"]["sub_number_" + str(i + 1)]
+            relevant_query_component = relevant_query_component["subqueries"]["sub_number_" + str(i + 1)]
+            i += 1
+        for k, v in relevant_info.items():
+            original_query_component = relevant_query_component[k]
+            original_query_components.append(original_query_component)
+            print("blahblahblah")
+            similarity_score = 0
+            for clause in relevant_decomposed_query[k]:
+                print(clause)
+                curr_score = SequenceMatcher(None, clause, v).ratio()
+                if similarity_score < curr_score:
+                    similarity_score = curr_score
+                print(curr_score)
+            if similarity_score > 0.65:
+                print("Fairly good match is found")
+        print(original_query_components)
+        print("The condition " + condition + " is implemented using hash join because ...")
 
 
 

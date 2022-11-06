@@ -3,6 +3,7 @@ import copy
 from connection import DB
 
 class PreProcessor:
+
     def __init__(self, query) -> None:
         # self.query_split = sqlparse.split(query)[0] # assuming only 1 query at a time
         # self.query_split = sqlparse.format(query, reindent=True, keyword_case="upper").splitlines()
@@ -101,12 +102,13 @@ class PreProcessor:
         aggregate = decomposed_query[last_keyword_token.value][-1]
         i += 1
         alias = tokens[i]
-        curr_component.append(alias.value)
-        decomposed_query[t.value][alias.value] = aggregate
+        curr_component.append(alias.value.lower())
+        decomposed_query[t.value][alias.value.lower()] = aggregate
         last_comma_index = i + 1
         return decomposed_query, i, last_comma_index, curr_component
 
     def handle_table_name(self, decomposed_query, tokens, t:token.SQLToken, i, last_keyword_token, last_comma_index):
+        # NOT IN USE
         if (t in self.tables):
             table = t
             decomposed_query[last_keyword_token.value].append(table.value.lower())
@@ -125,7 +127,7 @@ class PreProcessor:
         if "as" not in decomposed_query:
             return t
         if t.value in decomposed_query["as"]:
-            t.value = decomposed_query["as"][t.value]
+            t.value = decomposed_query["as"][t.value.lower()]
         return t
 
     def extract_where(self, decomposed_query, query_components, clause_tokens, tokens, overall_index, clause_list: list, last_keyword_token: token.SQLToken):
@@ -278,8 +280,10 @@ class PreProcessor:
 
                     decomposed_query[t.value] = []
                     query_components[t.value] = []
+
                     if (last_keyword_token is not None):
                         query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
+
                     curr_component = curr_component[-1:]
                     last_keyword_token = t
                     last_comma_index = i
@@ -322,9 +326,11 @@ class PreProcessor:
                 
                 if "as" not in decomposed_query:
                     decomposed_query["as"] = {}
-                decomposed_query["as"][prev_token.value.lower()] = t.value
+                decomposed_query["as"][prev_token.value.lower()] = t.value.lower()
                 tokens.pop(i)
                 continue
+            
+            # region
             # aggregates
             # elif t.value.lower() in self.aggregate_list:
             #     agg = t.value.lower()
@@ -339,14 +345,18 @@ class PreProcessor:
             #     agg += t.value.lower()
             #     print("Aggregate: " + agg)
             #     decomposed_query[last_keyword_token.value].append(agg)
+            # endregion
             
+            # region
             # default
             # elif (not t.is_comment and not t.is_punctuation):
             #     print(last_keyword_token.value)
             #     print(decomposed_query)
             #     decomposed_query[last_keyword_token.value].append(t.value)
-            
+            # endregion
+
             i += 1
+
         if (not semicolon_present):
             decomposed_query, last_comma_index = self.collapse_from_last_comma(decomposed_query, last_comma_index, last_keyword_token, tokens, i)
             last_comma_index = i
@@ -371,7 +381,7 @@ if __name__ == "__main__":
             supplier,
             nation
             where
-            PS.ps_suppkey = s_suppkey
+            P.ps_suppkey = s_suppkey
             and not s_nationkey = n_nationkey
             and n_name = 'GERMANY'
             and ps_supplycost > 20
@@ -394,7 +404,7 @@ if __name__ == "__main__":
             value;
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
-    preprocessor = PreProcessor(sql_query)
+    preprocessor = PreProcessor(long_query)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)
