@@ -102,38 +102,7 @@ select
       l_year;
 """
 
-primary_key_query = "select * from nation where nation.n_nationkey = 3;"
-
-# query = """
-# select
-#       ps_partkey
-#     from
-#       partsupp
-#     where
-#       ps_supplycost
-#     in (20,30,40)
-#     ;
-# """
-
-# query = """
-# select
-#       s_nationkey
-#     from
-#       supplier
-#     where
-#       s_nationkey in (select n_nationkey from nation)
-#    ;
-# """
-# lst_enable_disable = ["set enable_indexscan = false", "set enable_bitmapscan = false"]
-
-
-
-
-# db.execute("set enable_indexscan = false")
-# db.execute("set enable_bitmapscan = false")
-
 output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)[0][0][0]["Plan"]
-
 
 class Node():
 
@@ -369,129 +338,180 @@ class Node():
         for condition in conditions:
             print("The clause " + condition + " is implemented using " + self.type + " because ...")
 
-def cost_comparison(node: Node):
 
-    qep_node_type = node.type
-    qep_relation = node.information["Relation Name"]
-    qep_cost = node.information["Total Cost"]
-    cost_dict = {}
-    cost_dict[qep_node_type] = qep_cost
-    # disable what is used for QEP and remove it from the list
-    config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
-    if qep_node_type == "Seq Scan":
-        print("INSIDE SEQ SCAN")
-        db.execute("set enable_seqscan = false")
-        config_para_for_scans.remove("enable_seqscan")
-    elif qep_node_type == "Index Scan":
-        db.execute("set enable_indexscan = false")
-        config_para_for_scans.remove("enable_indexscan")  
-    elif qep_node_type == "Index Only Scan":
-        db.execute("set enable_indexonlyscan = false")
-        config_para_for_scans.remove("enable_indexonlyscan") 
-    elif qep_node_type == "Bitmap Scan":
-        db.execute("set enable_bitmapscan = false")
-        config_para_for_scans.remove("enable_bitmapscan")   
-    else:
-        pass
-    
-    print(config_para_for_scans)
-    # create instances where only one is enabled
-    for each_config in config_para_for_scans:
-        db.execute("set {} = false".format(each_config))
+def output_steps(output_plan):
 
-    # enable one each time
-    for each_config in config_para_for_scans:
-        print("GENERATING AQP!")
-        db.execute("set {} = true".format(each_config))
-        output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)[0][0][0]["Plan"]
-        
-        nodes = capture_nodes(output_plan, None)   
-        
-        for node in nodes:
-            # to find anotherrr forrm of scan
-            aqp_node_type = node.type
-            aqp_relation = node.information["Relation Name"]
-            if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
-                aqp_cost = node.information["Total Cost"]
-                cost_dict[aqp_node_type] = aqp_cost
-                break
+    cur_step = Node(output_plan)
 
-        db.execute("set {} = false".format(each_config))
-
-    if "join" in node.type.lower():
-        config_para_for_joins = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
-        pass
-
-    
-    return cost_dict
-
-
-def capture_nodes(dct, parent, subquery_level=0):
-
-    nodes = []
-
-    cur = Node(dct, subquery_level)
-    # print("Current Node Type: {}".format(type(cur)))
-
-    if "Plans" in dct:
-        plans = dct["Plans"]
+    if "Plans" in output_plan:
+        plans = output_plan["Plans"]
         for plan in plans:
-
-            dct = plan
-            if "Subplan Name" not in dct:
-                nodes = nodes + capture_nodes(dct, cur, subquery_level)
-                
-            else:
-                nodes = nodes + capture_nodes(dct, cur, subquery_level + 1)
-
-    cur.add_parent(parent)
-    nodes.append(cur)
-    
-
-    # update cur node as child of its parent
-    if not cur.parent[0] is None:
-        cur.parent[0].add_child(cur)
-
-    return nodes
+            
 
 
-print("\n######################################################################################################################\n")
-cost_of_scans_and_joins = {}
 
-# nodes = []
-# capture_nodes(dct, None)
+print("\n##################################################################\n")
 
-nodes = capture_nodes(output_plan, None)
+print("OUTPUT PLAN:")
+print(output_plan)
 
-j = 1
-for node in nodes:
 
-    print("STEP {}".format(j))
-    j = j + 1
 
-    node_type = node.type
-    print("NODE TYPE: {}".format(node_type))
-    print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
-    print("MAPPING: {}".format(node.mapping()))
-    # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
-    print("OTHER INFORMATION: {}".format(node.information))
-    if not node.parent[0] is None:
-        print("PARENT NODE TYPE: {}".format(node.parent[0].type))
-    print("SUBQUERY LEVEL: {}".format(node.subquery_level))
-    
-    children = node.children
-    if children:
-        i = 1
-        for child in children:
-            print("CHILD {} NODE TYPE: {}".format(i, node.children[0].type))
-            i = i + 1
 
-    if "scan" in node_type.lower() or "join" in node_type.lower():
-        print("cost_comparison() here")
-        print("COST COMPARISONL {}".format(cost_comparison(node)))
-    
-    print("\n")
 
-print("\n######################################################################################################################\n")
 
+
+
+
+
+print("\n##################################################################\n")
 db.close()
+
+
+
+# def generate_AQP(node: Node):
+#     if "scan" in node.type.lower():
+#         qep_node_type = node.information["Node Type"]
+#         qep_relation = node.information["Relation Name"]
+#         qep_cost = node.information["Total Cost"]
+        
+#         # disable what is used for QEP and remove it from the list
+#         config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enble_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+#         if qep_node_type == "Seq Scan":
+#             db.execute("set enable_seqscan = false")
+#             config_para_for_scans.remove("enable_seqscan")
+#         elif qep_node_type == "Index Scan":
+#             db.execute("set enable_indexscan = false")
+#             config_para_for_scans.remove("enable_indexscan")  
+#         elif qep_node_type == "Index Only Scan":
+#             db.execute("set enable_indexonlyscan = false")
+#             config_para_for_scans.remove("enable_indexonlyscan") 
+#         elif qep_node_type == "Bitmap Scan":
+#             db.execute("set enable_bitmapscan = false")
+#             config_para_for_scans.remove("enable_bitmapscan")   
+#         else:
+#             pass
+
+#         # create instances where only one is enabled
+#         for each_config in config_para_for_scans:
+#             db.execute("set {} = false".format(each_config))
+
+#         # enable one each time
+#         for each_config in config_para_for_scans:
+#             db.execute("set {} = true".format(each_config))
+
+#             analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)
+
+#             dct = analyze_fetched[0][0][0]["Plan"]   
+
+#             capture_nodes(dct, None)   
+            
+#             for node in nodes:
+#                 # print("STEP {}".format(j))
+#                 # j = j + 1
+#                 # print("NODE TYPE: {}".format(node.type))
+#                 print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
+#                 print("MAPPING: {}".format(node.mapping()))
+#                 # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
+#                 print("OTHER INFORMATION: {}".format(node.information))
+#                 if not node.parent[0] is None:
+#                     print("PARENT NODE TYPE: {}".format(node.parent[0].type))
+#                 print("SUBQUERY LEVEL: {}".format(node.subquery_level))
+                
+#                 children = node.children
+#                 if children:
+#                     i = 1
+#                     for child in children:
+#                         print("CHILD {} NODE TYPE: {}".format(i, node.children[0].type))
+#                         i = i + 1
+#             db.execute("set {} = false".format(each_config))
+    
+#     if "join" in node.type.lower():
+
+#         config_para_for_joins = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
+#         pass
+
+
+# def generate_query_nodes(dct):
+#     lst = []
+#     capture_nodes(dct, None, lst)
+#     return lst
+
+# def capture_nodes(dct, parent, subquery_level=0):
+
+#     cur = Node(dct, subquery_level)
+#     # print("Current Node Type: {}".format(type(cur)))
+
+#     if "Plans" in dct:
+#         plans = dct["Plans"]
+#         for plan in plans:
+
+#             dct = plan
+#             if "Subplan Name" not in dct:
+#                 capture_nodes(dct, cur, subquery_level)
+#             else:
+#                 capture_nodes(dct, cur, subquery_level + 1)
+
+#     cur.add_parent(parent)
+#     nodes.append(cur)
+
+#     # update cur node as child of its parent
+#     if not cur.parent[0] is None:
+#         cur.parent[0].add_child(cur)
+
+
+
+# print("\n######################################################################################################################")
+# cost_of_scans_and_joins = {}
+
+# nodes = generate_query_nodes(output_plan)
+
+
+# j = 1
+# for node in nodes:
+
+
+#     print("STEP {}".format(j))
+#     j = j + 1
+#     print("NODE TYPE: {}".format(node.type))
+#     print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
+#     print("MAPPING: {}".format(node.mapping()))
+#     # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
+#     print("OTHER INFORMATION: {}".format(node.information))
+#     if not node.parent[0] is None:
+#         print("PARENT NODE TYPE: {}".format(node.parent[0].type))
+#     print("SUBQUERY LEVEL: {}".format(node.subquery_level))
+    
+#     children = node.children
+#     if children:
+#         i = 1
+#         for child in children:
+#             print("CHILD {} NODE TYPE: {}".format(i, node.children[0].type))
+#             i = i + 1
+
+#     print("\n")
+
+    
+#     # if "Scan" in node.type:
+#     #     relation = node.information["Relation Name"]
+#     #     cost = node.get_estimated_cost()
+#     #     if  relation not in cost_of_scans_and_joins:
+#     #         cost_of_scans_and_joins[relation] = cost
+#     #     else:
+#     #         count = [key for key,value in cost_of_scans_and_joins.items() if relation in key].count()
+#     #         print("COUNTLALA: {}".format(count))
+#     #         cost_of_scans_and_joins["{}_{}".format(relation, count + 1)] = cost
+#     # if "Join" in node.type:
+#     #     relation = node.information["Relation"]
+#     #     cost = node.get_estimated.cost()
+#     #     if  relation not in cost_of_scans_and_joins:
+#     #         cost_of_scans_and_joins[relation] = cost
+#     #     else:
+#     #         count = [key for key,value in cost_of_scans_and_joins.items() if relation in key].count()
+#     #         cost_of_scans_and_joins["{}_{}".format(relation, count + 1)] = cost
+
+    
+            
+# print(cost_of_scans_and_joins)
+# print("\n######################################################################################################################")
+
