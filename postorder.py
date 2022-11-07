@@ -17,14 +17,15 @@ query_component_dict = {
     'subqueries': {'sub_number_1': {'subqueries': {}, 'select': 'select sum ( ps_supplycost * ps_availqty ) * 0.0001000000', '': '', 'from': 'from partsupp P1 , supplier S , nation', 'where': "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'"}}, 'select': 'select ps_partkey PS , sum ( ps_supplycost * ps_availqty ) as value', '': '', 'from': 'from partsupp P , supplier , nation', 'where': "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10", 'group by': 'group by ps_partkey', 'having': 'having sum ( ps_supplycost * ps_availqty ) >sub_number_1', 'order by': 'order by value ;'
     }
 
-decomposed_query ={
-    'subqueries': {}, 'select': ['*.*'], 'from': ['nation'], 'where': ['nation.n_nationkey = 3 ;']
-}
+# decomposed_query ={
+#     'subqueries': {}, 'select': ['*.*'], 'from': ['nation'], 'where': ['nation.n_nationkey = 3 ;']
+# }
 
-query_component_dict = {
-    'subqueries': {}, 'select': 'select *', '': '', 'from': 'from nation', 'where': 'where nation.n_nationkey = 3 ;'
-}
+# query_component_dict = {
+#     'subqueries': {}, 'select': 'select *', '': '', 'from': 'from nation', 'where': 'where nation.n_nationkey = 3 ;'
+# }
 
+component_mapping = {}
 
 query = """
 select
@@ -84,7 +85,7 @@ primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 db.execute("set enable_indexscan = false")
 # db.execute("set enable_bitmapscan = false")
 
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + primary_key_query)
+analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)
 
 dct = analyze_fetched[0][0][0]["Plan"]
 
@@ -286,6 +287,7 @@ class Node():
 
     def find_match_in_decomposed_query(self, relevant_info, decomposed_query, query_component_dict):
         conditions = []
+        explanations = []
         original_query_components = []
         i = 0
         relevant_decomposed_query = decomposed_query
@@ -299,10 +301,16 @@ class Node():
             if original_query_component is None:
                 continue
             if isinstance(v, list):
-                conditions.append("\"" + k + " " + " ".join(v) + "\"")
+                condition = "\"" + k + " " + " ".join(v) + "\""
             else:
-                conditions.append("\"" + k + " " + v + "\"")
+                condition = "\"" + k + " " + v + "\""
+            conditions.append(condition)
             original_query_components.append(original_query_component)
+            explanation = "The clause " + condition + " is implemented using " + self.type + " because ..."
+            explanations.append(explanation)
+            if original_query_component not in component_mapping:
+                component_mapping[original_query_component] = []
+            component_mapping[original_query_component].append(explanation)
             similarity_score = 0
             for clause in relevant_decomposed_query[k]:
                 print("Testing clause for match : {}".format(clause))
@@ -313,8 +321,11 @@ class Node():
             if similarity_score > 0.65:
                 print("Fairly good match is found")
         print(original_query_components)
-        for condition in conditions:
-            print("The clause " + condition + " is implemented using " + self.type + " because ...")
+        print(conditions)
+        print(explanations)
+        print(component_mapping)
+        
+        
 
 
 
