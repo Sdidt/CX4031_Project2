@@ -165,7 +165,7 @@ class Node():
     def get_estimated_cost(self):
         # startup_cost = self.information["Startup Cost"]
         startup_cost = 0
-        total_cost = self.information["Total Cost"]
+        total_cost = self.information["Total Cost"] * self.information["Actual Loops"]
         estimated_cost = startup_cost + total_cost
         return estimated_cost
 
@@ -332,6 +332,14 @@ class Node():
 
         return relevant_info
 
+    def print_debug_info(self):
+        print("NODE TYPE: {}".format(self.type))
+        print("ESTIMATED COST: {}".format(self.get_estimated_cost()))
+        print("MAPPING: {}".format(self.mapping()))
+        # print("RELEVANT INFORMATION: \n{}".format(self.get_relevant_info()))
+        print("OTHER INFORMATION: {}".format(self.information))
+
+    ### DO NOT USE THIS FUNCTION FOR FINAL. THEY HAVE BEEN ABSTRACTED AWAY TO THE ANNOTATOR. 
     def find_match_in_decomposed_query(self, relevant_info, decomposed_query, query_component_dict):
         conditions = []
         explanations = []

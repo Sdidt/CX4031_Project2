@@ -7,8 +7,8 @@ class Annotator:
         self.query = query
         self.db = db
         self.config_paras = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
-        self.QEP = self.generate_QEP()
-        self.AQPs = self.generate_AQPs()
+        self.QEP: list[Node] = self.generate_QEP()
+        self.AQPs: list[list[Node]] = self.generate_AQPs()
         self.component_mapping = {}
         self.decomposed_query = decomposed_query
         self.query_component_dict = query_component_dict
@@ -64,8 +64,6 @@ class Annotator:
         output_plan = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
         return self.capture_nodes(output_plan)
         
-
-
     def find_match_in_decomposed_query(self, node: Node):
         conditions = []
         explanations = []
@@ -118,6 +116,7 @@ class Annotator:
     def annotate_nodes(self):
         for node in self.QEP:
             node.mapping()
+            node.print_debug_info()
             self.find_match_in_decomposed_query(node)
 
     def explain_costs(self, cost_dict, qep_node_type, qep_cost):
@@ -134,16 +133,17 @@ class Annotator:
             else:   
                 anomalous_ratios[node_type] =  1 / ratio
         if len(ratios) == 1:
-            choice_explanation = " it requires " + "{:.2f}".format(list(ratios.values())[0]) + " less operations than " + "{:.2f}".format(list(ratios.keys())[0]) + "."
+            choice_explanation = "it requires " + "{:.2f}".format(list(ratios.values())[0]) + " less operations than " + "{}".format(list(ratios.keys())[0]) + "."
         else:
-            choice_explanation = " it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
+            choice_explanation = "it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
         if len(anomalous_ratios) == 1:
-            choice_explanation += " However, surprisingly, using " + "{:.2f}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less than " + node_type + "."
+            choice_explanation += "However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less than " + node_type + "."
         elif len(anomalous_ratios) > 1:
-            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less than " + node_type + "."
+            choice_explanation += "However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less than " + node_type + "."
         return choice_explanation
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
+        qep_node = node
         qep_node_type = node.type
         qep_relation = node.information["Relation Name"]
         qep_filter = node.information.get("Filter")
@@ -157,7 +157,8 @@ class Annotator:
 
         # enable one each time
         for each_config in config_para_for_scans:
-            
+            print("\n######################################################################################################################\n")   
+            print("COMPARING WITH AQP {}".format(each_config)) 
             AQP = self.AQPs[each_config]
             
             is_bitmap_index_scan = False
@@ -165,8 +166,7 @@ class Annotator:
 
             for node in AQP:
                 # to find anotherrr forrm of scan
-                print(node.type)
-                print(node.information)
+                node.print_debug_info()
                 aqp_node_type = node.type
                 if node.type == "Bitmap Index Scan":
                     is_bitmap_index_scan = True
@@ -190,18 +190,14 @@ class Annotator:
                             continue
                 if qep_filter != aqp_filter:
                     print("Condition is not matching!")
-                    print(aqp_node_type)
-                    print(qep_node_type)
-                    print(aqp_filter)
-                    print(qep_filter)
                     continue
                 if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
                     aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
                     cost_dict[aqp_node_type] = aqp_cost
                     break
-
+            print("\n######################################################################################################################\n")   
             # db.execute("set {} = false".format(each_config))
-        
+        print("COST COMPARISON: {}".format(cost_dict))
         choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
 
         if "join" in node.type.lower():

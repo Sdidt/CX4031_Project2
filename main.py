@@ -2,6 +2,7 @@ from connection import DB
 from preprocessing import PreProcessor
 from annotation import Annotator
 
+# region
 # def generate_AQPs(config_paras, db: DB):
     
 #     print("\n######################################################################################################################\n")
@@ -119,7 +120,7 @@ from annotation import Annotator
 
     
 #     return cost_dict
-
+# endregion
 
 if __name__ == "__main__":
     db = DB()
@@ -202,7 +203,7 @@ if __name__ == "__main__":
 
     primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
-    preprocessor = PreProcessor(query, db)
+    preprocessor = PreProcessor(primary_key_query, db)
 
     print("\n######################################################################################################################\n")
 
@@ -211,7 +212,7 @@ if __name__ == "__main__":
     print(preprocessor.query_components)
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(primary_key_query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     annotator.annotate_nodes()
 
@@ -220,6 +221,8 @@ if __name__ == "__main__":
     print("ANNOTATOR RESULTS")
 
     print(annotator.component_mapping)
+
+    print("\n######################################################################################################################\n")
 
     db.close()
 
