@@ -4,11 +4,12 @@ from connection import DB
 
 class PreProcessor:
 
-    def __init__(self, query) -> None:
+    def __init__(self, query, db) -> None:
         # self.query_split = sqlparse.split(query)[0] # assuming only 1 query at a time
         # self.query_split = sqlparse.format(query, reindent=True, keyword_case="upper").splitlines()
         # self.query = self.clean(self.query_split)
         self.query = query
+        self.db = db
         self.parser = Parser(self.query)
         self.tokens = self.parser.tokens
         self.tables = self.parser.tables
@@ -52,13 +53,12 @@ class PreProcessor:
         print("Parenthesis level: " + str(t.parenthesis_level))
 
     def get_metadata(self):
-        db = DB()
-        result = db.execute("select table_name from information_schema.tables where table_schema='public'")
+        result = self.db.execute("select table_name from information_schema.tables where table_schema='public'")
         self.all_column_names = {}
         self.all_table_names = [res[0] for res in result]
         print(self.all_table_names)
         for table in self.all_table_names:
-            result = db.execute("select * from information_schema.columns where table_name='{}' order by ordinal_position".format(table))
+            result = self.db.execute("select * from information_schema.columns where table_name='{}' order by ordinal_position".format(table))
             for val in result:
                 self.all_column_names[val[3]] = table
         print(self.all_column_names)

@@ -59,7 +59,7 @@ select
             value;
 """
 
-cmoplex_query = """
+complex_query = """
 select
       supp_nation,
       cust_nation,
@@ -144,6 +144,7 @@ class Node():
         self.parent = []
         self.children = []
         self.information = None
+        self.keywords = None
 
         d = data.copy()
         d.pop("Node Type")
@@ -170,28 +171,28 @@ class Node():
 
     def mapping(self):
 
-        keywords = {}
+        self.keywords = {}
 
         if self.type == "Seq Scan":
-            keywords = self.node_seq_scan()
+            self.keywords = self.node_seq_scan()
         elif self.type == "Index Scan":
-            keywords = self.node_index_scan()
+            self.keywords = self.node_index_scan()
         elif self.type == "Bitmap Index Scan":
-            keywords = self.node_bitmap_index_scan()
+            self.keywords = self.node_bitmap_index_scan()
         elif self.type == "Bitmap Heap Scan":
-            keywords = self.node_bitmap_heap_scan()
+            self.keywords = self.node_bitmap_heap_scan()
         elif self.type == "Hash":
-            keywords = self.node_hash()
+            self.keywords = self.node_hash()
         elif self.type == "Hash Join":
-            keywords = self.node_hash_join()
+            self.keywords = self.node_hash_join()
         elif self.type == "Materialize":
             pass
         elif self.type == "Nested Loop":
-            keywords = self.node_nested_loop()
+            self.keywords = self.node_nested_loop()
         elif self.type == "Aggregate":
-            keywords = self.node_aggregate()
+            self.keywords = self.node_aggregate()
         elif "Sort" in self.type:
-            keywords = self.node_sort()
+            self.keywords = self.node_sort()
         elif self.type == "Gather Merge":
             pass
         else:
@@ -199,7 +200,7 @@ class Node():
     
         # converting dictionary to a list of dictionaries
         lst = [{"level": self.subquery_level}]
-        for key,value in keywords.items():
+        for key,value in self.keywords.items():
             dct = {}
             dct[key] = value
             lst.append(dct)
@@ -228,7 +229,6 @@ class Node():
         key = self.remove_punctuations(key)
         relevant_info["order by"] = key + " " + order
     
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
         return relevant_info
     
     # complete
@@ -256,7 +256,7 @@ class Node():
         #     relevant_info["level"] = level
         # else:
         #     relevant_info["level"] = 0
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
+        # self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
@@ -278,7 +278,6 @@ class Node():
                 relevant_info["where"] = index_cond1
                 relevant_info["in"] = index_cond2
 
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
@@ -297,7 +296,6 @@ class Node():
                 relevant_info["where"] = index_cond1
                 relevant_info["in"] = index_cond2
 
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
@@ -306,7 +304,6 @@ class Node():
         relation = self.information.get("Alias")
         relevant_info["from"] = relation
 
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
 
         return relevant_info
 
@@ -322,18 +319,16 @@ class Node():
         keywords = ["where", "in"]
         for keyword in keywords:
             relevant_info[keyword] = condition
-        self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
         
         return relevant_info
     
     # complete
     def node_nested_loop(self):
         relevant_info = {}
-        # condition = self.information['Join Filter'][1:-1]
-        # keywords = ["where", "in"]
-        # for keyword in keywords:
-        #     relevant_info[keyword] = condition
-        # self.find_match_in_decomposed_query(relevant_info, decomposed_query, query_component_dict)
+        condition = self.information['Join Filter'][1:-1]
+        keywords = ["where", "in"]
+        for keyword in keywords:
+            relevant_info[keyword] = condition
 
         return relevant_info
 
@@ -372,61 +367,95 @@ class Node():
                 print("Similarity Score: {}".format(curr_score))
             if similarity_score > 0.65:
                 print("Fairly good match is found")
-        print(original_query_components)
-        print(conditions)
-        print(explanations)
-        print(component_mapping)
-        
-        
+        # print(original_query_components)
+        # print(conditions)
+        # print(explanations)
+        # print(component_mapping)
 
-def cost_comparison(node: Node):
+### DO NOT USE THE FOLLOWING 3 FUNCTIONS FOR FINAL. THEY HAVE BEEN ABSTRACTED AWAY TO THE ANNOTATOR. 
+
+def generate_AQPs(config_paras):
+    
+    print("\n######################################################################################################################\n")
+
+    print("GENERATING AQPS")
+
+    AQPs = {k: None for k in config_paras}
+    
+    for each_config in config_paras:
+        db.execute("set {} = false".format(each_config))
+
+    for each_config in config_paras:
+        db.execute("set {} = true".format(each_config))
+        AQP = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)[0][0][0]["Plan"]
+        AQPs[each_config] = (AQP)
+        db.execute("set {} = false".format(each_config))
+        
+    print("\n######################################################################################################################\n")
+
+    return AQPs
+
+def cost_comparison_scan(node: Node, config_para_for_scans, AQPs):
 
     qep_node_type = node.type
     qep_relation = node.information["Relation Name"]
-    qep_cost = node.information["Total Cost"]
+    qep_filter = node.information.get("Filter")
+    if qep_filter is None:
+        qep_filter = node.information.get("Index Cond")
+    qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
     cost_dict = {}
     cost_dict[qep_node_type] = qep_cost
-    # disable what is used for QEP and remove it from the list
-    config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
-    if qep_node_type == "Seq Scan":
-        print("INSIDE SEQ SCAN")
-        db.execute("set enable_seqscan = false")
-        config_para_for_scans.remove("enable_seqscan")
-    elif qep_node_type == "Index Scan":
-        db.execute("set enable_indexscan = false")
-        config_para_for_scans.remove("enable_indexscan")  
-    elif qep_node_type == "Index Only Scan":
-        db.execute("set enable_indexonlyscan = false")
-        config_para_for_scans.remove("enable_indexonlyscan") 
-    elif qep_node_type == "Bitmap Scan":
-        db.execute("set enable_bitmapscan = false")
-        config_para_for_scans.remove("enable_bitmapscan")   
-    else:
-        pass
     
     print(config_para_for_scans)
-    # create instances where only one is enabled
-    for each_config in config_para_for_scans:
-        db.execute("set {} = false".format(each_config))
 
     # enable one each time
     for each_config in config_para_for_scans:
-        print("GENERATING AQP!")
-        db.execute("set {} = true".format(each_config))
-        output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)[0][0][0]["Plan"]
         
-        nodes = capture_nodes(output_plan, None)   
+        AQP = AQPs[each_config]
+
+        nodes = capture_nodes(AQP, None)   
         
+        is_bitmap_index_scan = False
+        bitmap_index_scan_cond = None
+
         for node in nodes:
             # to find anotherrr forrm of scan
+            print(node.type)
+            print(node.information)
             aqp_node_type = node.type
+            if node.type == "Bitmap Index Scan":
+                is_bitmap_index_scan = True
+                bitmap_index_scan_cond = node.information["Index Cond"]
+            # if "Relation Name" not in node.information:
+            #     print(node.type)
+            #     print(node.information)
+            if "Relation Name" not in node.information:
+                continue
+            aqp_filter = None
             aqp_relation = node.information["Relation Name"]
+            if qep_filter is not None:
+                if is_bitmap_index_scan:
+                    aqp_filter = bitmap_index_scan_cond
+                    is_bitmap_index_scan = False
+                    bitmap_index_scan_cond = None
+                aqp_filter = node.information.get("Filter")
+                if aqp_filter is None:
+                    aqp_filter = node.information.get("Index Cond")
+                    if aqp_filter is None:
+                        continue
+            if qep_filter != aqp_filter:
+                print("Condition is not matching!")
+                print(aqp_node_type)
+                print(qep_node_type)
+                print(aqp_filter)
+                print(qep_filter)
+                continue
             if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
-                aqp_cost = node.information["Total Cost"]
+                aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
                 cost_dict[aqp_node_type] = aqp_cost
                 break
 
-        db.execute("set {} = false".format(each_config))
+        # db.execute("set {} = false".format(each_config))
 
     if "join" in node.type.lower():
         config_para_for_joins = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
@@ -434,7 +463,6 @@ def cost_comparison(node: Node):
 
     
     return cost_dict
-
 
 def capture_nodes(dct, parent, subquery_level=0):
 
@@ -465,43 +493,49 @@ def capture_nodes(dct, parent, subquery_level=0):
     return nodes
 
 
-print("\n######################################################################################################################\n")
-cost_of_scans_and_joins = {}
+if __name__ == "__main__":
+    print("\n######################################################################################################################\n")
+    cost_of_scans_and_joins = {}
 
-# nodes = []
-# capture_nodes(dct, None)
+    # nodes = []
+    # capture_nodes(dct, None)
 
-nodes = capture_nodes(output_plan, None)
+    nodes: list[Node] = capture_nodes(output_plan, None)
+    config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+    AQPs = generate_AQPs(config_para_for_scans)
 
-j = 1
-for node in nodes:
+    j = 1
+    for node in nodes:
 
-    print("STEP {}".format(j))
-    j = j + 1
+        print("STEP {}".format(j))
+        j = j + 1
 
-    node_type = node.type
-    print("NODE TYPE: {}".format(node_type))
-    print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
-    print("MAPPING: {}".format(node.mapping()))
-    # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
-    print("OTHER INFORMATION: {}".format(node.information))
-    if not node.parent[0] is None:
-        print("PARENT NODE TYPE: {}".format(node.parent[0].type))
-    print("SUBQUERY LEVEL: {}".format(node.subquery_level))
-    
-    children = node.children
-    if children:
-        i = 1
-        for child in children:
-            print("CHILD {} NODE TYPE: {}".format(i, node.children[0].type))
-            i = i + 1
+        node_type = node.type
+        print("NODE TYPE: {}".format(node_type))
+        print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
+        print("MAPPING: {}".format(node.mapping()))
+        # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
+        print("OTHER INFORMATION: {}".format(node.information))
+        if not node.parent[0] is None:
+            print("PARENT NODE TYPE: {}".format(node.parent[0].type))
+        print("SUBQUERY LEVEL: {}".format(node.subquery_level))
+        
+        children = node.children
+        if children:
+            i = 1
+            for child in children:
+                print("CHILD {} NODE TYPE: {}".format(i, node.children[0].type))
+                i = i + 1
 
-    if "scan" in node_type.lower() or "join" in node_type.lower():
-        print("cost_comparison() here")
-        print("COST COMPARISONL {}".format(cost_comparison(node)))
-    
-    print("\n")
+        if "scan" in node_type.lower(): # or "join" in node_type.lower():
+            print("cost_comparison() here")
+            print("COST COMPARISON: {}".format(cost_comparison_scan(node, config_para_for_scans, AQPs)))
+        
+        print("\n")
 
-print("\n######################################################################################################################\n")
+    print("\n######################################################################################################################\n")
 
-db.close()
+    print("COMPONENT MAPPING: {}".format(component_mapping))
+
+
+    db.close()

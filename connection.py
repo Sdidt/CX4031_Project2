@@ -15,7 +15,7 @@ class DB:
         try:
             query_results = self.cursor.fetchall()
         except psycopg2.ProgrammingError:
-            print("No results to fetch")
+            print("Command executed has no results to fetch.")
         return query_results
     
     def close(self):
