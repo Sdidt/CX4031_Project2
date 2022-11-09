@@ -492,8 +492,8 @@ if __name__ == "__main__":
                     WHERE
                         l_partkey = ps_partkey
                         AND l_suppkey = ps_suppkey
-                        AND l_shipdate >= MDY(1,1,1994)
-                        AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
+                        AND l_shipdate >= date 1-1-1994
+                        AND l_shipdate < date 1-1-1994 + '1 year'
                 )
         )
         AND s_nationkey = n_nationkey

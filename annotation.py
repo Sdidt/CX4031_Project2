@@ -201,7 +201,7 @@ class Annotator:
                     print("Condition is not matching!")
                     continue
                 if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
-                    aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+                    aqp_cost = node.get_estimated_cost()
                     cost_dict[aqp_node_type] = aqp_cost
                     break
             print("\n######################################################################################################################\n")   

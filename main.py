@@ -205,48 +205,48 @@ if __name__ == "__main__":
 
     # primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
-    # q22 = """
-    #     SELECT
-    #     s_name,
-    #     s_address
-    # FROM
-    #     supplier,
-    #     nation
-    # WHERE
-    #     s_suppkey IN (
-    #         SELECT
-    #             ps_suppkey
-    #         FROM
-    #             partsupp
-    #         WHERE
-    #             ps_partkey IN (
-    #                 SELECT
-    #                     p_partkey
-    #                 FROM
-    #                     part
-    #                 WHERE
-    #                     p_name LIKE 'forest%'
-    #             )
-    #             AND ps_availqty > (
-    #                 SELECT
-    #                     0.5 * SUM(l_quantity)
-    #                 FROM
-    #                     lineitem
-    #                 WHERE
-    #                     l_partkey = ps_partkey
-    #                     AND l_suppkey = ps_suppkey
-    #                     AND l_shipdate >= MDY(1,1,1994)
-    #                     AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
-    #             )
-    #     )
-    #     AND s_nationkey = n_nationkey
-    #     AND n_name = 'CANADA'
-    # ORDER BY
-    #     s_name
-    #     """
+    q22 = """
+        SELECT
+        s_name,
+        s_address
+    FROM
+        supplier,
+        nation
+    WHERE
+        s_suppkey IN (
+            SELECT
+                ps_suppkey
+            FROM
+                partsupp
+            WHERE
+                ps_partkey IN (
+                    SELECT
+                        p_partkey
+                    FROM
+                        part
+                    WHERE
+                        p_name LIKE 'forest%'
+                )
+                AND ps_availqty > (
+                    SELECT
+                        0.5 * SUM(l_quantity)
+                    FROM
+                        lineitem
+                    WHERE
+                        l_partkey = ps_partkey
+                        AND l_suppkey = ps_suppkey
+                        AND l_shipdate >= date '1-1-1994'
+                        AND l_shipdate < date '1-1-1994' + INTERVAL '1 year'
+                )
+        )
+        AND s_nationkey = n_nationkey
+        AND n_name = 'CANADA'
+    ORDER BY
+        s_name
+        """
 
     print("Hello")
-    preprocessor = PreProcessor(query, db)
+    preprocessor = PreProcessor(q22, db)
 
     print("\n######################################################################################################################\n")
 
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     print()
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(q22, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     annotator.annotate_nodes()
 
