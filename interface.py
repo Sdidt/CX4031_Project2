@@ -179,7 +179,8 @@ app.layout = html.Div(children=[
     State('textarea-sql-query', 'value')
 )
 def update_output(n_clicks, value):
-    df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
+    
+    html_output = []
     dict_output = {'query_1': {'subqueries': 
     {'subquery_1': {'subqueries': {}, 'from partsupp P1 , supplier S , nation': ['The clause "from p1" is implemented using Seq Scan because no other option is available.', 'The clause "from s" is implemented using Seq Scan because it requires 44.62, 10351967.39 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "from nation_1" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'": ['The clause "where nation_1.n_name = \'GERMANY\'" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where s.s_nationkey = nation_1.n_nationkey" is implemented using Hash Join.', 'The clause "where p1.ps_suppkey = s.s_suppkey" is implemented using Hash Join.']}}
     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
@@ -197,10 +198,13 @@ def update_output(n_clicks, value):
     dict_array = []
     for i in range(len(dict_keys)):
         # print(str(dict_keys[i]))
+        div_component = html.Div(str(dict_keys[i]) + ": ", style={"font-weight": "bold"})
+        html_output.append(div_component)
+        divider = html.Div(className="vl", style={'width':'max-width', 'border-top':'2px solid black', 'padding-right': 10})
+        html_output.append(divider)
         # dict_object = {'Query': str(dict_keys[i]), 'Natural Language Description': str(dict_keys[i])}
         # dict_array.append(dict_object)
         nested_dict = dict_values[i]
-        
         # print(list(nested_dict.keys()))
         nested_dict_keys = list(nested_dict.keys())
         nested_dict_values = list(nested_dict.values())
@@ -210,12 +214,15 @@ def update_output(n_clicks, value):
                 nested_dict_subquery = nested_dict_values[j]
                 # print(nested_dict_subquery)
                 nested_dict_subquery_keys = list(nested_dict_subquery.keys())
-                # print(nested_dict_subquery_keys)
                 nested_dict_subquery_values = list(nested_dict_subquery.values())
+                dict_array = []
                 for k in range(len(nested_dict_subquery_keys)):
+                    div_component = html.Div(str(nested_dict_subquery_keys[k] + ": "), style={"padding-left": 20})
+                    html_output.append(div_component)
                     nested_subquery_values = nested_dict_subquery_values[k]
                     nested_subquery_values_keys = list(nested_subquery_values.keys())
                     nested_subquery_values_values = list(nested_subquery_values.values())
+                    
                     for l in range(len(nested_subquery_values_keys)):
                         if (nested_subquery_values_keys[l] == "subqueries"):
                             nested_nested_dict_subquery = nested_subquery_values_values[l]
@@ -227,6 +234,22 @@ def update_output(n_clicks, value):
                                 dict_temp_str += item + "\n"
                             dict_object = {'Query': str(nested_subquery_values_keys[l]), 'Natural Language Description': str(dict_temp_str)}
                             dict_array.append(dict_object)
+                    # print(dict_array)
+                    div_component = dash_table.DataTable(data=dict_array, 
+                    style_table={
+                        'padding-left': 20,
+                        'padding-bottom': 10,
+                        'width': 'auto',
+                        'max-height': '580px', 
+                        'overflowY': 'auto'
+                    },
+                    style_data={
+                    'whiteSpace': 'pre-line',
+                    'height': 'auto'
+                    },
+                    style_cell={'textAlign': 'left'})
+                    html_output.append(div_component)
+                    dict_array = []
 
             else:
                 dict_temp_array = nested_dict_values[j]
@@ -236,6 +259,23 @@ def update_output(n_clicks, value):
                 
                 dict_object = {'Query': str(nested_dict_keys[j]), 'Natural Language Description': str(dict_temp_str)}
                 dict_array.append(dict_object)
+        print(dict_array)
+        div_component = dash_table.DataTable(data=dict_array, 
+                    style_table={
+                        'padding-left': 1,
+                        'padding-bottom': 10,
+                        'width': 'auto',
+                        'max-height': '580px', 
+                        'overflowY': 'auto'
+                    },
+                    style_data={
+                    'whiteSpace': 'pre-line',
+                    'height': 'auto'
+                    },
+                    style_cell={'textAlign': 'left'})
+        html_output.append(div_component)  
+
+
 
         # print(list(nested_dict['subqueries']))
     # for i in range(len(dict_output)):
@@ -272,20 +312,21 @@ def update_output(n_clicks, value):
         # results = "callfunction"
         # print(str(df.to_dict('records')))
         # print(str(dict_array))
-        
-        return dash_table.DataTable(data=dict_array, 
-        style_table={
-            'padding-left': 1,
-            'width': 'auto',
-            'height': '580px', 
-            'overflowY': 'auto'
-        },
-        style_data={
-        'whiteSpace': 'pre-line',
-        'height': 'auto'
-        },
-        style_cell={'textAlign': 'left'},
-        merge_duplicate_headers=True)
+        print(html_output)
+        return html.Div(html_output)
+        # return html.Div([html.Div("Header"), dash_table.DataTable(data=dict_array, 
+        # style_table={
+        #     'padding-left': 1,
+        #     'width': 'auto',
+        #     'height': '580px', 
+        #     'overflowY': 'auto'
+        # },
+        # style_data={
+        # 'whiteSpace': 'pre-line',
+        # 'height': 'auto'
+        # },
+        # style_cell={'textAlign': 'left'})
+        # ])
         # return dash_table.DataTable(df.to_dict('records'))
         # return dash_table.DataTable([{'query':'sojfjjf', 'nl':'efjifj'},{'query':'sss', 'nl':'jff'}])
 
