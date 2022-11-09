@@ -1,6 +1,6 @@
 from connection import DB
-from preprocessing import PreProcessor
-from annotation import Annotator
+from preprocessing_2_test import PreProcessor
+from annotation_2_test import Annotator
 
 # region
 # def generate_AQPs(config_paras, db: DB):
@@ -203,16 +203,23 @@ if __name__ == "__main__":
 
     primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
-    preprocessor = PreProcessor(primary_key_query, db)
+    preprocessor = PreProcessor(query, db)
 
     print("\n######################################################################################################################\n")
 
     print("PREPROCESSING RESULTS")
 
+    print("Query Components:")
+    print()
     print(preprocessor.query_components)
+    
+    print()
+
+    print("Decomposed Query:")
+    print()
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(primary_key_query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     annotator.annotate_nodes()
 

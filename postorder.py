@@ -325,6 +325,7 @@ class Node():
     # complete
     def node_nested_loop(self):
         relevant_info = {}
+        print(self.information)
         condition = self.information['Join Filter'][1:-1]
         keywords = ["where", "in"]
         for keyword in keywords:
@@ -335,7 +336,7 @@ class Node():
     def print_debug_info(self):
         print("NODE TYPE: {}".format(self.type))
         print("ESTIMATED COST: {}".format(self.get_estimated_cost()))
-        print("MAPPING: {}".format(self.mapping()))
+        # print("MAPPING: {}".format(self.mapping()))
         # print("RELEVANT INFORMATION: \n{}".format(self.get_relevant_info()))
         print("OTHER INFORMATION: {}".format(self.information))
 
