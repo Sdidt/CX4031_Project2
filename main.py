@@ -264,7 +264,32 @@ if __name__ == "__main__":
 
     annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
+    print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
     annotator.annotate_nodes()
+
+    j = 1
+    for node in annotator.QEP:
+        print("STEP {}".format(j))
+        j = j + 1
+
+        node_type = node.type
+        print("NODE TYPE: {}".format(node_type))
+        print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
+        print("MAPPING: {}".format(node.mapping()))
+        # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
+        print("OTHER INFORMATION: {}".format(node.information))
+        if not node.parent[0] is None:
+            print("PARENT NODE TYPE: {}".format(node.parent[0].type))
+        print("SUBQUERY LEVEL: {}".format(node.subquery_level))
+        
+        children = node.children
+        if children:
+            i = 1
+            for child in children:
+                print("CHILD {} NODE TYPE: {}".format(i, node.children[i-1].type))
+                i = i + 1
+        print("\n")
+    print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
 
     print("\n######################################################################################################################\n")
 
