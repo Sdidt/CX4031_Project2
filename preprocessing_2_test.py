@@ -76,7 +76,7 @@ class PreProcessor:
         # logic to assign each set of columns to each table dynamically, by querying the DB for table info
     
     def get_column_to_table_mapping(self):
-        query_columns = {column: self.all_column_names[column] if column != '*' else column for column in self.columns}
+        query_columns = {column: self.all_column_names[column] if column not in ['*', 'UNITS'] else column for column in self.columns}
         return query_columns
 
     def prepend_table_name_to_column(self, curr_query, t: token.SQLToken, curr_level):
@@ -131,7 +131,7 @@ class PreProcessor:
             t.value = curr_query["as"][t.value.lower()]
         return t
 
-    def extract_where(self, curr_query, query_components, clause_tokens, clause_list: list, last_keyword_token: token.SQLToken, query_alias, curr_level):
+    def extract_where_having(self, curr_query, query_components, clause_tokens, clause_list: list, last_keyword_token: token.SQLToken, query_alias, curr_level):
         i = 0
         last_index = i
         curr_clause_not = False
@@ -156,12 +156,15 @@ class PreProcessor:
                 subquery_start_index = i
                 # self.curr_subquery_num += 1
                 # curr_query, query_components, i, subquery_alias = self.extract_subquery(curr_query, query_components, clause_tokens, i, last_keyword_token, t)
-                if (curr_level + 1) not in self.curr_query_num:
+                if query_alias not in self.curr_query_num:
+                    self.curr_query_num[query_alias] = {}
+                if (curr_level + 1) not in self.curr_query_num[query_alias]:
                     self.curr_query_num[query_alias][curr_level + 1] = 1
                 else:
                     self.curr_query_num[query_alias][curr_level + 1] += 1
                 # self.curr_subquery_num += 1
                 curr_query, query_components, i, subquery_alias = self.extract_subquery(curr_query, query_components, clause_tokens, i, last_keyword_token, t, self.curr_query_num[query_alias][curr_level + 1], curr_level + 1)
+                i -= 1
                 print("Subquery alias: " + subquery_alias)
             if t.is_keyword and (t.value.lower() == "and" or t.value.lower() == "or"):
                 if not contains_subquery:
@@ -226,7 +229,7 @@ class PreProcessor:
         for tok in subquery_tokens:
             print("Value: " + tok.value)
         print("End of subquery tokens")
-        subquery_alias = "subquery_" + str(subquery_number)
+        subquery_alias = ("sub" * subquery_level) + "query_" + str(subquery_number)
         subquery_decomposed_query = {subquery_alias: {"subqueries": {}}}
         subquery_components = {subquery_alias: {"subqueries": {}}}
         subquery_tokens = subquery_tokens[:-1]
@@ -250,14 +253,19 @@ class PreProcessor:
         i = 0
         semicolon_present = False
         curr_component = []
-        curr_query = decomposed_query[list(decomposed_query.keys())[-1]]
-        curr_query_components = query_components[list(query_components.keys())[-1]]
+        curr_query = decomposed_query[query_alias]
+        curr_query_components = query_components[query_alias]
+        print(decomposed_query)
+        print(query_components)
+        print(curr_query)
+        print(curr_query_components)
+        set_op = False
         while i < len(tokens):
             t: token.SQLToken = tokens[i]
             curr_component.append(t.value)
             t = self.prepend_table_name_to_column(curr_query, t, curr_level)
             t = self.replace_alias_with_expression(curr_query, t)
-            print("Value: " + str(t.value))
+            # print("Value: " + str(t.value))
 
             if (t.value.lower() == ";"):
                 semicolon_present = True
@@ -324,14 +332,32 @@ class PreProcessor:
                         for tok in where_tokens:
                             print("Value: " + str(tok.value))
                         print("End of " + clause + " tokens")
-                        curr_query, clause_list = self.extract_where(curr_query, curr_query_components, where_tokens, [], last_keyword_token, query_alias, curr_level)
+                        curr_query, clause_list = self.extract_where_having(curr_query, curr_query_components, where_tokens, [], last_keyword_token, query_alias, curr_level)
                         curr_component.extend(clause_list)
                         last_comma_index = i + 1                                                
+
+                    if (t.value.lower() == "union" or t.value.lower() == "intersect" or t.value.lower() == "minus"):
+                        i += 1
+                        set_op = t.value.lower()
+                        t = tokens[i]
+                        self.curr_query_num[query_alias][curr_level] += 1
+                        next_query_alias = query_alias.split("_")[0] + "_" + str(self.curr_query_num[query_alias][curr_level])
+                        decomposed_query[next_query_alias] = {"subqueries": {}}
+                        query_components[next_query_alias] = {"subqueries": {}}
+                        decomposed_query, query_components = self.extract_keywords(tokens[i:], decomposed_query, query_components, parenthesis_level, curr_level, next_query_alias)
+                        curr_query[set_op] = next_query_alias
+                        curr_query_components[set_op] = set_op + " " + next_query_alias
+                        print("finished recursive handling")
+                        print(decomposed_query)
+                        print(query_components)
+                        break
 
                 # subquery
                 else:
                     print("Reached subquery case")
-                    if (curr_level + 1) not in self.curr_query_num:
+                    if query_alias not in self.curr_query_num:
+                        self.curr_query_num[query_alias] = {}
+                    if (curr_level + 1) not in self.curr_query_num[query_alias]:
                         self.curr_query_num[query_alias][curr_level + 1] = 1
                     else:
                         self.curr_query_num[query_alias][curr_level + 1] += 1
@@ -378,7 +404,7 @@ class PreProcessor:
 
             i += 1
 
-        if (not semicolon_present):
+        if (not semicolon_present and not set_op):
             curr_query, last_comma_index = self.collapse_from_last_comma(curr_query, last_comma_index, last_keyword_token, tokens, i, curr_level)
             last_comma_index = i
             if (last_keyword_token is not None):
@@ -388,8 +414,11 @@ class PreProcessor:
             if (curr_query["order by"][-1] not in ["asc", "desc"]):
                 curr_query["order by"][-1] += " asc"
 
-        decomposed_query[list(decomposed_query.keys())[-1]] = curr_query
-        query_components[list(query_components.keys())[-1]] = curr_query_components
+        if '' in curr_query_components:
+            del curr_query_components['']
+
+        decomposed_query[query_alias] = curr_query
+        query_components[query_alias] = curr_query_components
 
         return decomposed_query, query_components
 
@@ -429,7 +458,51 @@ if __name__ == "__main__":
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
     primary_key_query = "select * from nation where nation.n_nationkey = 3;"
-    preprocessor = PreProcessor(primary_key_query)
+    set_query = "select n_nationkey from nation intersect select s_nationkey from supplier"
+    q20 = """
+        SELECT
+        s_name,
+        s_address
+    FROM
+        supplier,
+        nation
+    WHERE
+        s_suppkey IN (
+            SELECT
+                ps_suppkey
+            FROM
+                partsupp
+            WHERE
+                ps_partkey IN (
+                    SELECT
+                        p_partkey
+                    FROM
+                        part
+                    WHERE
+                        p_name LIKE 'forest%'
+                )
+                AND ps_availqty > (
+                    SELECT
+                        0.5 * SUM(l_quantity)
+                    FROM
+                        lineitem
+                    WHERE
+                        l_partkey = ps_partkey
+                        AND l_suppkey = ps_suppkey
+                        AND l_shipdate >= MDY(1,1,1994)
+                        AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
+                )
+        )
+        AND s_nationkey = n_nationkey
+        AND n_name = 'CANADA'
+    ORDER BY
+        s_name
+        """
+
+
+    db = DB()
+
+    preprocessor = PreProcessor(q20, db)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)
@@ -441,6 +514,8 @@ if __name__ == "__main__":
     print(preprocessor.parser.tables_aliases)
     print(preprocessor.tables)
     # print(preprocessor.query)
+
+    db.close()
 
 
 # from decomposed query has aliases due to the table name to alias mapping in as dictionary and working collapse form last comma. 

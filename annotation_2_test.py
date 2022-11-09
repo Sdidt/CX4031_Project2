@@ -127,8 +127,6 @@ class Annotator:
             # print(self.component_mapping)
 
     def find_match_in_decomposed_query(self, node: Node, i=0):
-        explanations = []
-        original_query_components = []
         for k, v in node.keywords.items():
             optimal_key_chain, optimal_clause, similarity_score = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
             print("Optimal key chain: ")

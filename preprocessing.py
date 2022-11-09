@@ -402,7 +402,10 @@ if __name__ == "__main__":
     """
     sql_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
     primary_key_query = "select * from nation where nation.n_nationkey = 3;"
-    preprocessor = PreProcessor(primary_key_query)
+
+    db = DB()
+
+    preprocessor = PreProcessor(complex_query, db)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)
@@ -414,6 +417,8 @@ if __name__ == "__main__":
     print(preprocessor.parser.tables_aliases)
     print(preprocessor.tables)
     # print(preprocessor.query)
+
+    db.close()
 
 
 # from decomposed query has aliases due to the table name to alias mapping in as dictionary and working collapse form last comma. 

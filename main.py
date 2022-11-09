@@ -201,9 +201,51 @@ if __name__ == "__main__":
         l_year;
     """
 
+    complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
+
     primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
-    preprocessor = PreProcessor(query, db)
+    q22 = """
+        SELECT
+        s_name,
+        s_address
+    FROM
+        supplier,
+        nation
+    WHERE
+        s_suppkey IN (
+            SELECT
+                ps_suppkey
+            FROM
+                partsupp
+            WHERE
+                ps_partkey IN (
+                    SELECT
+                        p_partkey
+                    FROM
+                        part
+                    WHERE
+                        p_name LIKE 'forest%'
+                )
+                AND ps_availqty > (
+                    SELECT
+                        0.5 * SUM(l_quantity)
+                    FROM
+                        lineitem
+                    WHERE
+                        l_partkey = ps_partkey
+                        AND l_suppkey = ps_suppkey
+                        AND l_shipdate >= MDY(1,1,1994)
+                        AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
+                )
+        )
+        AND s_nationkey = n_nationkey
+        AND n_name = 'CANADA'
+    ORDER BY
+        s_name
+        """
+
+    preprocessor = PreProcessor(complex_query, db)
 
     print("\n######################################################################################################################\n")
 
@@ -219,7 +261,7 @@ if __name__ == "__main__":
     print()
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(complex_query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     annotator.annotate_nodes()
 
