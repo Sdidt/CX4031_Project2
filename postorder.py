@@ -204,10 +204,14 @@ class Node():
 
     def get_estimated_cost(self):
         # startup_cost = self.information["Startup Cost"]
-        startup_cost = 0
-        total_cost = self.information["Total Cost"] * self.information["Actual Loops"]
-        estimated_cost = startup_cost + total_cost
-        return estimated_cost
+        children: list[Node] = self.children
+        total_cost_of_child = 0
+        for child in children:
+            total_cost_of_child += child.information["Total Cost"] * child.information["Actual Loops"]
+
+        qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
+        diff = qep_cost - total_cost_of_child
+        return diff
 
     def mapping(self):
 
@@ -359,10 +363,10 @@ class Node():
         keywords = ["where", "in"]
         for keyword in keywords:
             relevant_info[keyword] = condition
-        
+        self.join_filter = ""
         return relevant_info
     
-    # complete
+    # TODO: handle case when no join filter is present; drill down to closest index scan/bitmap index scan
     def node_nested_loop(self):
         relevant_info = {}
         print(self.information)
@@ -370,8 +374,12 @@ class Node():
         keywords = ["where", "in"]
         for keyword in keywords:
             relevant_info[keyword] = condition
-
+        self.join_filter = ""
         return relevant_info
+
+    #TODO: complete this function
+    def node_merge_join(self):
+        pass
 
     def print_debug_info(self):
         print("NODE TYPE: {}".format(self.type))

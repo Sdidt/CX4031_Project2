@@ -15,7 +15,8 @@ class Annotator:
     def __init__(self, query, decomposed_query, query_component_dict, db: DB) -> None:
         self.query = query
         self.db = db
-        self.config_paras = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        self.config_paras_scan = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        self.config_paras_join = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
         self.QEP: list[Node] = self.generate_QEP()
         self.AQPs: list[list[Node]] = self.generate_AQPs()
         self.component_mapping: dict = {}
@@ -27,21 +28,41 @@ class Annotator:
 
         print("GENERATING AQPS")
 
-        AQPs = {k: None for k in self.config_paras}
-        
-        for each_config in self.config_paras:
+        # AQPs = {k: None for k in self.config_paras_scan}
+        AQPs = {}
+
+        # isolate scans 
+        for each_config in self.config_paras_scan:
             self.db.execute("set {} = false".format(each_config))
 
-        for each_config in self.config_paras:
+        for each_config in self.config_paras_scan:
             self.db.execute("set {} = true".format(each_config))
             AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
             AQP = self.capture_nodes(AQP)
             AQPs[each_config] = AQP
             self.db.execute("set {} = false".format(each_config))
+        
+        for each_config in self.config_paras_scan:
+            self.db.execute("set {} = true".format(each_config))
+
+        # isolate joins
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
+            AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
+            AQP = self.capture_nodes(AQP)
+            AQPs[each_config] = AQP
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
             
         print("\n######################################################################################################################\n")
 
         return AQPs
+
 
     def capture_nodes(self, dct, parent=None, subquery_level=0):
         nodes = []
@@ -159,8 +180,13 @@ class Annotator:
                 # original_query_components.append(original_query_component)
                 explanation = "The clause " + condition + " is implemented using " + node.type
                 if "scan" in node.type.lower():
-                    cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras)
+                    print("FOUND SCAN NODE IN MATCH QUERY")
+                    cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras_scan)
                     explanation += " because " + choice_explanation
+                elif "join" in node.type.lower() or "nested loop" in node.type.lower():
+                    print("FOUND JOIN NODE IN MATCH QUERY")
+                    cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)   
+                    explanation += " because " + choice_explanation        
                 else:
                     explanation += "."
                 # explanations.append(explanation)
@@ -209,11 +235,19 @@ class Annotator:
         qep_filter = node.information.get("Filter")
         if qep_filter is None:
             qep_filter = node.information.get("Index Cond")
-        qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+
+        # children = node.children
+        # total_cost_of_child = 0
+        # for child in children:
+        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # diff = qep_cost - total_cost_of_child
+        qep_cost = node.get_estimated_cost()
         cost_dict = {}
         cost_dict[qep_node_type] = qep_cost
         
-        print(config_para_for_scans)
+        # print(config_para_for_scans)
 
         # enable one each time
         for each_config in config_para_for_scans:
@@ -252,18 +286,88 @@ class Annotator:
                     print("Condition is not matching!")
                     continue
                 if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
-                    aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+                    # children = node.children
+                    # total_cost_of_child = 0
+                    # for child in children:
+                    #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+                    # aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"] 
+                    # diff = aqp_cost - total_cost_of_child
+                    aqp_cost = node.get_estimated_cost()
                     cost_dict[aqp_node_type] = aqp_cost
                     break
             print("\n######################################################################################################################\n")   
             # db.execute("set {} = false".format(each_config))
         print("COST COMPARISON: {}".format(cost_dict))
+
+        print("\n######################################################################################################################\n") 
         choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
-
-        # if "join" in node.type.lower():
-        #     config_para_for_joins = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
-        #     pass
-
         
         return cost_dict, choice_explanation
 
+    def cost_comparison_join(self, node: Node, config_para_for_join):
+        qep_node_type = node.type
+        # change this to use node.join_filter instead
+        if qep_node_type == 'Hash Join':
+            qep_filter = node.information["Hash Cond"]
+        elif qep_node_type == 'Nested Loop':
+            qep_filter = node.information["Join Filter"]
+        elif qep_node_type == 'Merge Join':
+            qep_filter = node.information["Join Filter"]
+        else:
+            qep_filter == None
+
+        # USE THIS INSTEAD
+        # qep_filter = node.join_filter
+
+        # children = node.children
+        # total_cost_of_child = 0
+        # for child in children:
+        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # diff = qep_cost - total_cost_of_child
+        qep_cost = node.get_estimated_cost()
+        cost_dict = {}
+        cost_dict[qep_node_type] = qep_cost
+
+        # enable one each time
+        for each_config in config_para_for_join:
+            print("\n######################################################################################################################\n")   
+            print("COMPARING WITH AQP {}".format(each_config)) 
+            AQP = self.AQPs[each_config]
+
+            for node in AQP:
+                # to find another forrm of scan
+                node.print_debug_info()
+                aqp_node_type = node.type
+                if aqp_node_type == "Hash Join":
+                    aqp_filter = node.information["Hash Cond"]
+                elif aqp_node_type == "Nested Loop":
+                    aqp_filter = node.information["Join Filter"]
+                elif aqp_node_type == "Merge Join":
+                    aqp_filter = node.information["Join Filter"]
+                else:
+                    aqp_filter = None
+         
+                if qep_filter != aqp_filter:
+                    print("Condition is not matching!")
+                    continue
+                if "join" in aqp_node_type.lower() or "nested loop" in aqp_node_type.lower():
+                    if aqp_filter == qep_filter:
+                        # children = node.children
+                        # total_cost_of_child = 0
+                        # for child in children:
+                        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+
+                        # aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+                        aqp_cost = node.get_estimated_cost()
+                        # node_cost = aqp_cost - total_cost_of_child
+                        cost_dict = {}
+                        cost_dict[aqp_node_type] = aqp_cost
+                        break
+            print("\n######################################################################################################################\n")   
+            # db.execute("set {} = false".format(each_config))
+        print("COST COMPARISON: {}".format(cost_dict))
+        choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
+        
+        return cost_dict, choice_explanation

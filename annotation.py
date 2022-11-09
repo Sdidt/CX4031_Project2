@@ -187,15 +187,16 @@ class Annotator:
         if qep_filter is None:
             qep_filter = node.information.get("Index Cond")
 
-        children = node.children
-        total_cost_of_child = 0
-        for child in children:
-            total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+        # children = node.children
+        # total_cost_of_child = 0
+        # for child in children:
+        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
 
-        qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
-        diff = qep_cost - total_cost_of_child
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # diff = qep_cost - total_cost_of_child
+        qep_cost = node.get_estimated_cost()
         cost_dict = {}
-        cost_dict[qep_node_type] = diff
+        cost_dict[qep_node_type] = qep_cost
         
         # print(config_para_for_scans)
 
@@ -264,15 +265,16 @@ class Annotator:
         else:
             qep_filter == None
 
-        children = node.children
-        total_cost_of_child = 0
-        for child in children:
-            total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+        # children = node.children
+        # total_cost_of_child = 0
+        # for child in children:
+        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
 
-        qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
-        diff = qep_cost - total_cost_of_child
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # diff = qep_cost - total_cost_of_child
+        qep_cost = node.get_estimated_cost()
         cost_dict = {}
-        cost_dict[qep_node_type] = diff
+        cost_dict[qep_node_type] = qep_cost
 
         # enable one each time
         for each_config in config_para_for_join:
@@ -298,15 +300,16 @@ class Annotator:
                     continue
                 if "join" in aqp_node_type.lower() or "nested loop" in aqp_node_type.lower():
                     if aqp_filter == qep_filter:
-                        children = node.children
-                        total_cost_of_child = 0
-                        for child in children:
-                            total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
+                        # children = node.children
+                        # total_cost_of_child = 0
+                        # for child in children:
+                        #     total_cost_of_child = total_cost_of_child + child.information["Total Cost"] * child.information["Actual Loops"]
 
-                        aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
-                        diff = aqp_cost - total_cost_of_child
+                        # aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+                        aqp_cost = node.get_estimated_cost()
+                        # node_cost = aqp_cost - total_cost_of_child
                         cost_dict = {}
-                        cost_dict[aqp_node_type] = diff
+                        cost_dict[aqp_node_type] = aqp_cost
                         break
             print("\n######################################################################################################################\n")   
             # db.execute("set {} = false".format(each_config))
