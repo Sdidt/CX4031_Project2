@@ -1,155 +1,298 @@
-from dotenv import load_dotenv
-from result_parser import ResultParser
-from tree import Node
+from postorder import Node
+from difflib import SequenceMatcher
 from connection import DB
+from result_parser.result_parser import ResultParser
+from result_parser.node_types.default_node import default_define
+class Annotator:
+    def __init__(self, query, decomposed_query, query_component_dict, db: DB, index_column_dict) -> None:
+        self.query = query
+        self.db = db
+        self.config_paras_scan = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        self.config_paras_join = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
+        self.QEP: list[Node] = self.generate_QEP()
+        self.AQPs: list[list[Node]] = self.generate_AQPs()
+        self.component_mapping = {"subqueries": {}}
+        self.decomposed_query = decomposed_query
+        self.query_component_dict = query_component_dict
+        self.result_parser =  default_define
+        self.index_column_dict = index_column_dict
 
-load_dotenv()
+    def generate_AQPs(self):
+        print("\n######################################################################################################################\n")
 
-def construct_operator_tree(actual_plan: dict):
-    q = [actual_plan.copy()]
-    # print(actual_plan.keys())
-    actual_plan.pop("Plans")
-    node_list = [Node(actual_plan.copy())]
-    root = node_list[0]
-    # print(actual_plan)
-    # print(q)
-    while len(q) != 0:
-        actual_plan = q.pop(0)
-        parent: Node = node_list.pop(0)
-        # print(parent.plan)
-        # print("Actual plan:")
-        # print(actual_plan)
-        if "Plans" not in actual_plan:
-            # print(actual_plan)
-            continue
-        actual_plan = actual_plan["Plans"]
-        # print(len(actual_plan))
-        for plan in actual_plan:
-            # print(plan)
-            if "Plans" in plan:
-                q.append(plan.copy())
-                plan.pop("Plans")
-                node_list.append(Node(plan.copy()))
-                parent.add_child(node_list[-1])
+        print("GENERATING AQPS")
+
+        # AQPs = {k: None for k in self.config_paras_scan}
+        AQPs = {}
+
+        # isolate scans 
+        for each_config in self.config_paras_scan:
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_scans:
+            self.db.execute("set {} = true".format(each_config))
+            AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
+            AQP = self.capture_nodes(AQP)
+            AQPs[each_config] = AQP
+            self.db.execute("set {} = false".format(each_config))
+        
+        for each_config in self.config_paras_scan:
+            self.db.execute("set {} = true".format(each_config))
+
+        # isolate joins
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
+            AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
+            AQP = self.capture_nodes(AQP)
+            AQPs[each_config] = AQP
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
+            
+        print("\n######################################################################################################################\n")
+
+        return AQPs
+
+    def capture_nodes(self, dct, parent=None, subquery_level=0):
+        nodes = []
+
+        cur = Node(dct, subquery_level)
+        # print("Current Node Type: {}".format(type(cur)))
+
+        if "Plans" in dct:
+            plans = dct["Plans"]
+            for plan in plans:
+
+                dct = plan
+                if "Subplan Name" not in dct:
+                    nodes = nodes + self.capture_nodes(dct, cur, subquery_level)
+                    
+                else:
+                    nodes = nodes + self.capture_nodes(dct, cur, subquery_level + 1)
+
+        cur.add_parent(parent)
+        nodes.append(cur)
+
+        # update cur node as child of its parent
+        if not cur.parent[0] is None:
+            cur.parent[0].add_child(cur)
+
+        return nodes
+
+    def generate_QEP(self):
+        output_plan = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
+        return self.capture_nodes(output_plan)
+        
+    def find_match_in_decomposed_query(self, node: Node):
+        conditions = []
+        explanations = []
+        original_query_components = []
+        i = 0
+        relevant_decomposed_query = self.decomposed_query
+        relevant_query_component = self.query_component_dict
+        relevant_component_mapping = self.component_mapping
+        relevant_info = node.keywords
+        while i < node.subquery_level:
+            relevant_decomposed_query = relevant_decomposed_query["subqueries"]["sub_number_" + str(i + 1)]
+            relevant_query_component = relevant_query_component["subqueries"]["sub_number_" + str(i + 1)]
+            relevant_component_mapping = relevant_component_mapping["subqueries"]
+            i += 1
+        for k, v in relevant_info.items():
+            optimal_clause = None
+            original_query_component = relevant_query_component.get(k, None)
+            if original_query_component is None:
+                continue
+            if isinstance(v, list):
+                condition = "\"" + k + " " + " ".join(v) + "\""
             else:
-                parent.add_child(Node(plan.copy()))
-            # print(plan)
-    print(root.print_tree())
-    return root
+                condition = "\"" + k + " " + v + "\""
+            conditions.append(condition)
+            original_query_components.append(original_query_component)
+            print("99999999999999999999999999999999999999")
+            print(node.type)
+            self.result_parser = ResultParser.results_map.get(node.type, default_define)
+            explanation =  self.result_parser(node,condition,self.index_column_dict)
+           # explanation = "The clause " + condition + " is implemented using " + node.type
+            if "scan" in node.type.lower():
+                cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras)
+                explanation += " because " + choice_explanation
+            elif "join" in node.type.lower() or "nested loop" in node.type.lower():
+                print("FOUND JOIN NODE IN MATCH QUERY")
+                cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)           
+            else:
+                explanation += "."
+            explanations.append(explanation)
+            if original_query_component not in relevant_component_mapping:
+                relevant_component_mapping[original_query_component] = []
+            relevant_component_mapping[original_query_component].append(explanation)
+            similarity_score = 0
+            print("\n######################################################################################################################\n")   
+            print("MATCHING CLAUSE {}".format(v))         
+            for clause in relevant_decomposed_query[k]:
+                print("Testing clause for match : {}".format(clause))
+                curr_score = SequenceMatcher(None, clause, v).ratio()
+                if similarity_score < curr_score:
+                    similarity_score = curr_score
+                    optimal_clause = v
+                print("Similarity Score: {}".format(curr_score))
+            if similarity_score > 0.65:
+                print("Fairly good match is found: {}".format(optimal_clause))
+            print("\n######################################################################################################################\n") 
+        # print(self.component_mapping)
+        return
+    
+    def annotate_nodes(self):
+        for node in self.QEP:
+            node.mapping()
+            node.print_debug_info()
+            self.find_match_in_decomposed_query(node)
 
-def annotate_various_nodes(root: Node):
-	result_parser = ResultParser()
-	level = 1
-	q = [(root, level)]
-	reverse_order = []
-	prev_level = -1
-	while len(q) != 0:
-		cursor, level = q.pop(0)
-		reverse_order.insert(0, (cursor, level))
-		if level != prev_level:
-			# print("Level " + str(level))
-			prev_level = level
-		# print(cursor.plan)
-		q.extend([(child, level + 1) for child in cursor.children])
-	while len(reverse_order) != 0:
-		cursor, level = reverse_order.pop(0)
-		# print(cursor.plan)
-		if cursor.plan["Node Type"] == "Seq Scan":
-			print(result_parser.seq_scan_rule(cursor, level == 1))
-		elif cursor.plan["Node Type"] == "Hash":
-			print(result_parser.hash_rule(cursor))
-		elif cursor.plan["Node Type"] == "Hash Join":
-			print(result_parser.hash_join_rule(cursor, level == 1))
-		
-db = DB()
+    def explain_costs(self, cost_dict, qep_node_type, qep_cost):
+        if len(cost_dict) == 1:
+            return "no other option is available."
+        ratios = {}
+        anomalous_ratios = {}
+        for node_type, cost in cost_dict.items():
+            if node_type == qep_node_type:
+                continue
+            ratio = cost / qep_cost
+            if ratio > 1.0:
+                ratios[node_type] = ratio
+            else:   
+                anomalous_ratios[node_type] =  1 / ratio
+        if len(ratios) == 1:
+            choice_explanation = "it requires " + "{:.2f}".format(list(ratios.values())[0]) + " less operations than " + "{}".format(list(ratios.keys())[0]) + "."
+        else:
+            choice_explanation = "it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
+        if len(anomalous_ratios) == 1:
+            choice_explanation += "However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less than " + node_type + "."
+        elif len(anomalous_ratios) > 1:
+            choice_explanation += "However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less than " + node_type + "."
+        return choice_explanation
 
-result = db.execute("select version()")
-print(result)
+    def cost_comparison_scan(self, node: Node, config_para_for_scans):
+        qep_node = node
+        qep_node_type = node.type
+        qep_relation = node.information["Relation Name"]
+        qep_filter = node.information.get("Filter")
+        if qep_filter is None:
+            qep_filter = node.information.get("Index Cond")
+        qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        cost_dict = {}
+        cost_dict[qep_node_type] = qep_cost
+        
+        print(config_para_for_scans)
 
-# conn = psycopg2.connect(database="TPC-H", user=os.getenv('DB_USERNAME'), password=os.getenv('DB_PASSWORD'), host="127.0.0.1", port=5432)
+        # enable one each time
+        for each_config in config_para_for_scans:
+            print("\n######################################################################################################################\n")   
+            print("COMPARING WITH AQP {}".format(each_config)) 
+            AQP = self.AQPs[each_config]
+            
+            is_bitmap_index_scan = False
+            bitmap_index_scan_cond = None
 
-# cursor = conn.cursor()
+            for node in AQP:
+                # to find anotherrr forrm of scan
+                node.print_debug_info()
+                aqp_node_type = node.type
+                if node.type == "Bitmap Index Scan":
+                    is_bitmap_index_scan = True
+                    bitmap_index_scan_cond = node.information["Index Cond"]
+                # if "Relation Name" not in node.information:
+                #     print(node.type)
+                #     print(node.information)
+                if "Relation Name" not in node.information:
+                    continue
+                aqp_filter = None
+                aqp_relation = node.information["Relation Name"]
+                if qep_filter is not None:
+                    if is_bitmap_index_scan:
+                        aqp_filter = bitmap_index_scan_cond
+                        is_bitmap_index_scan = False
+                        bitmap_index_scan_cond = None
+                    aqp_filter = node.information.get("Filter")
+                    if aqp_filter is None:
+                        aqp_filter = node.information.get("Index Cond")
+                        if aqp_filter is None:
+                            continue
+                if qep_filter != aqp_filter:
+                    print("Condition is not matching!")
+                    continue
+                if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
+                    aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+                    cost_dict[aqp_node_type] = aqp_cost
+                    break
+            print("\n######################################################################################################################\n")   
+            # db.execute("set {} = false".format(each_config))
+        print("COST COMPARISON: {}".format(cost_dict))
+        choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
+        
+        return cost_dict, choice_explanation
 
-# cursor.execute("select version()")
+    def cost_comparison_join(self, node: Node, config_para_for_join):
+        qep_node = node
+        qep_node_type = node.type
+        placeholder = {}
 
-# data = cursor.fetchone()
-# print("Connection established to: ",data)
+        return placeholder, str(node.information)
+        # qep_filter = node.information.get("Filter")
+        # if qep_filter is None:
+        #     qep_filter = node.information.get("Index Cond")
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # cost_dict = {}
+        # cost_dict[qep_node_type] = qep_cost
+        
+        # return cost_dict, choice_explanation
+        # print(config_para_for_join)
 
-# # cursor.execute("set enable_hashjoin = false")
+        # # enable one each time
+        # for each_config in config_para_for_join:
+        #     print("\n######################################################################################################################\n")   
+        #     print("COMPARING WITH AQP {}".format(each_config)) 
+        #     AQP = self.AQPs[each_config]
+            
+        #     is_bitmap_index_scan = False
+        #     bitmap_index_scan_cond = None
 
-# cursor.fetchall()
-
-sql_query = 'SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey'
-
-complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus"
-
-complex_sql_query = """
-select 
-      l_returnflag,
-      l_linestatus,
-      sum(l_quantity) as sum_qty,
-      sum(l_extendedprice) as sum_base_price,
-      sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
-      sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
-      avg(l_quantity) as avg_qty,
-      avg(l_extendedprice) as avg_price,
-      avg(l_discount) as avg_disc
-    from
-      lineitem
-    where
-      l_extendedprice > 100
-    group by
-      l_returnflag,
-      l_linestatus
-    order by
-      l_returnflag,
-      l_linestatus;
-"""   
-
-long_query = """
-        select
-            ps_partkey,
-            sum(ps_supplycost * ps_availqty) as value
-            from
-            partsupp,
-            supplier,
-            nation
-            where
-            ps_suppkey = s_suppkey
-            and not s_nationkey = n_nationkey
-            and n_name = 'GERMANY'
-            and ps_supplycost > 20
-            and s_acctbal > 10
-            group by
-            ps_partkey having
-                sum(ps_supplycost * ps_availqty) > (
-                select
-                    sum(ps_supplycost * ps_availqty) * 0.0001000000
-                from
-                    partsupp,
-                    supplier,
-                    nation
-                where
-                    ps_suppkey = s_suppkey
-                    and s_nationkey = n_nationkey
-                    and n_name = 'GERMANY'
-                )
-            order by
-            value desc;
-    """
-
-print(complex_query)
-
-analyze_fetched = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + complex_query)
-
-actual_plan: dict = analyze_fetched[0][0][0]["Plan"]
-print("Full Result:")
-print(actual_plan)
-print("Operator Tree:")
-root = construct_operator_tree(actual_plan)
-
-annotate_various_nodes(root)
-
-db.close()
-
-# Use SequenceMatcher from difflib for heuristic based matching of query clauses to nodes
+        #     for node in AQP:
+        #         # to find anotherrr forrm of scan
+        #         node.print_debug_info()
+        #         aqp_node_type = node.type
+        #         if node.type == "Bitmap Index Scan":
+        #             is_bitmap_index_scan = True
+        #             bitmap_index_scan_cond = node.information["Index Cond"]
+        #         # if "Relation Name" not in node.information:
+        #         #     print(node.type)
+        #         #     print(node.information)
+        #         if "Relation Name" not in node.information:
+        #             continue
+        #         aqp_filter = None
+        #         aqp_relation = node.information["Relation Name"]
+        #         if qep_filter is not None:
+        #             if is_bitmap_index_scan:
+        #                 aqp_filter = bitmap_index_scan_cond
+        #                 is_bitmap_index_scan = False
+        #                 bitmap_index_scan_cond = None
+        #             aqp_filter = node.information.get("Filter")
+        #             if aqp_filter is None:
+        #                 aqp_filter = node.information.get("Index Cond")
+        #                 if aqp_filter is None:
+        #                     continue
+        #         if qep_filter != aqp_filter:
+        #             print("Condition is not matching!")
+        #             continue
+        #         if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
+        #             aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        #             cost_dict[aqp_node_type] = aqp_cost
+        #             break
+        #     print("\n######################################################################################################################\n")   
+        #     # db.execute("set {} = false".format(each_config))
+        # print("COST COMPARISON: {}".format(cost_dict))
+        # choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
+        
+        # return cost_dict, choice_explanation

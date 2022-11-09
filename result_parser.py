@@ -1,4 +1,4 @@
-from tree import Node
+from postorder import Node
 
 class ResultParser:
     
