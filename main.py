@@ -124,7 +124,7 @@ from annotation_2_test import Annotator
 
 if __name__ == "__main__":
     db = DB()
-
+    
     query = """
     select
                 ps_partkey PS,
@@ -157,95 +157,96 @@ if __name__ == "__main__":
                 value;
     """
 
-    complex_query = """
-    select
-        supp_nation,
-        cust_nation,
-        l_year,
-        sum(volume) as revenue
-        from
-        (
-            select
-            n1.n_name as supp_nation,
-            n2.n_name as cust_nation,
-            DATE_PART('YEAR',l_shipdate) as l_year,
-            l_extendedprice * (1 - l_discount) as volume
-            from
-            supplier,
-            lineitem,
-            orders,
-            customer,
-            nation n1,
-            nation n2
-            where
-            s_suppkey = l_suppkey
-            and o_orderkey = l_orderkey
-            and c_custkey = o_custkey
-            and s_nationkey = n1.n_nationkey
-            and c_nationkey = n2.n_nationkey
-            and (
-                (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
-                or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
-            )
-            and l_shipdate between '1995-01-01' and '1996-12-31'
-            and o_totalprice > 100
-            and c_acctbal > 10
-        ) as shipping
-        group by
-        supp_nation,
-        cust_nation,
-        l_year
-        order by
-        supp_nation,
-        cust_nation,
-        l_year;
-    """
+    # complex_query = """
+    # select
+    #     supp_nation,
+    #     cust_nation,
+    #     l_year,
+    #     sum(volume) as revenue
+    #     from
+    #     (
+    #         select
+    #         n1.n_name as supp_nation,
+    #         n2.n_name as cust_nation,
+    #         DATE_PART('YEAR',l_shipdate) as l_year,
+    #         l_extendedprice * (1 - l_discount) as volume
+    #         from
+    #         supplier,
+    #         lineitem,
+    #         orders,
+    #         customer,
+    #         nation n1,
+    #         nation n2
+    #         where
+    #         s_suppkey = l_suppkey
+    #         and o_orderkey = l_orderkey
+    #         and c_custkey = o_custkey
+    #         and s_nationkey = n1.n_nationkey
+    #         and c_nationkey = n2.n_nationkey
+    #         and (
+    #             (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+    #             or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+    #         )
+    #         and l_shipdate between '1995-01-01' and '1996-12-31'
+    #         and o_totalprice > 100
+    #         and c_acctbal > 10
+    #     ) as shipping
+    #     group by
+    #     supp_nation,
+    #     cust_nation,
+    #     l_year
+    #     order by
+    #     supp_nation,
+    #     cust_nation,
+    #     l_year;
+    # """
 
-    complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
+    # complex_query = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge from lineitem where l_shipdate <= date '1998-12-01' group by l_returnflag, l_linestatus order by sum_disc_price, l_linestatus"
 
-    primary_key_query = "select * from nation where nation.n_nationkey = 3;"
+    # primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
-    q22 = """
-        SELECT
-        s_name,
-        s_address
-    FROM
-        supplier,
-        nation
-    WHERE
-        s_suppkey IN (
-            SELECT
-                ps_suppkey
-            FROM
-                partsupp
-            WHERE
-                ps_partkey IN (
-                    SELECT
-                        p_partkey
-                    FROM
-                        part
-                    WHERE
-                        p_name LIKE 'forest%'
-                )
-                AND ps_availqty > (
-                    SELECT
-                        0.5 * SUM(l_quantity)
-                    FROM
-                        lineitem
-                    WHERE
-                        l_partkey = ps_partkey
-                        AND l_suppkey = ps_suppkey
-                        AND l_shipdate >= MDY(1,1,1994)
-                        AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
-                )
-        )
-        AND s_nationkey = n_nationkey
-        AND n_name = 'CANADA'
-    ORDER BY
-        s_name
-        """
+    # q22 = """
+    #     SELECT
+    #     s_name,
+    #     s_address
+    # FROM
+    #     supplier,
+    #     nation
+    # WHERE
+    #     s_suppkey IN (
+    #         SELECT
+    #             ps_suppkey
+    #         FROM
+    #             partsupp
+    #         WHERE
+    #             ps_partkey IN (
+    #                 SELECT
+    #                     p_partkey
+    #                 FROM
+    #                     part
+    #                 WHERE
+    #                     p_name LIKE 'forest%'
+    #             )
+    #             AND ps_availqty > (
+    #                 SELECT
+    #                     0.5 * SUM(l_quantity)
+    #                 FROM
+    #                     lineitem
+    #                 WHERE
+    #                     l_partkey = ps_partkey
+    #                     AND l_suppkey = ps_suppkey
+    #                     AND l_shipdate >= MDY(1,1,1994)
+    #                     AND l_shipdate < MDY(1,1,1994) + 1 UNITS YEAR
+    #             )
+    #     )
+    #     AND s_nationkey = n_nationkey
+    #     AND n_name = 'CANADA'
+    # ORDER BY
+    #     s_name
+    #     """
 
-    preprocessor = PreProcessor(complex_query, db)
+    print("Hello")
+    preprocessor = PreProcessor(query, db)
 
     print("\n######################################################################################################################\n")
 
@@ -261,7 +262,7 @@ if __name__ == "__main__":
     print()
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(complex_query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     annotator.annotate_nodes()
 

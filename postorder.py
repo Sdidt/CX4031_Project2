@@ -169,8 +169,6 @@ q20 = """
 # """
 # lst_enable_disable = ["set enable_indexscan = false", "set enable_bitmapscan = false"]
 
-output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + q20)[0][0][0]["Plan"]
-
 # db.execute("set enable_indexscan = false")
 # db.execute("set enable_bitmapscan = false")
 
@@ -545,6 +543,7 @@ def capture_nodes(dct, parent, subquery_level=0):
 
 
 if __name__ == "__main__":
+    output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + q20)[0][0][0]["Plan"]
     print("in main")
     print("\n######################################################################################################################\n")
     cost_of_scans_and_joins = {}

@@ -8,6 +8,7 @@ class PreProcessor:
         # self.query_split = sqlparse.split(query)[0] # assuming only 1 query at a time
         # self.query_split = sqlparse.format(query, reindent=True, keyword_case="upper").splitlines()
         # self.query = self.clean(self.query_split)
+        print("Inside init")
         self.query = query
         self.db = db
         self.parser = Parser(self.query)
@@ -57,7 +58,9 @@ class PreProcessor:
         print("Parenthesis level: " + str(t.parenthesis_level))
 
     def get_metadata(self):
-        result = self.db.execute("select table_name from information_schema.tables where table_schema='public'")
+        print("Getting metadata")
+        result = self.db.execute("select table_name from information_schema.tables where table_schema='public';")
+        print("Ran")
         self.all_column_names = {}
         self.all_table_names = [res[0] for res in result]
         print(self.all_table_names)

@@ -8,6 +8,10 @@ class DB:
     def __init__(self, host="127.0.0.1", database="TPC-H", user=os.getenv('DB_USERNAME'), password=os.getenv('DB_PASSWORD'), port=5432) -> None:
         self.conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
         self.cursor = self.conn.cursor()
+        print(self.conn)
+        print(self.cursor)
+        print("Connection established")
+        return
     
     def execute(self, query):
         self.cursor.execute(query)
