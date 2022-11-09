@@ -105,6 +105,48 @@ select
 
 primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 
+q20 = """
+        SELECT
+        s_name,
+        s_address
+    FROM
+        supplier,
+        nation
+    WHERE
+        s_suppkey IN (
+            SELECT
+                ps_suppkey
+            FROM
+                partsupp
+            WHERE
+                ps_partkey IN (
+                    SELECT
+                        p_partkey
+                    FROM
+                        part
+                    WHERE
+                        p_name LIKE 'forest%'
+                )
+                AND ps_availqty > (
+                    SELECT
+                        0.5 * SUM(l_quantity)
+                    FROM
+                        lineitem
+                    WHERE
+                        l_partkey = ps_partkey
+                        AND l_suppkey = ps_suppkey
+                        AND l_shipdate >= DATE '1-1-1994'
+                        AND l_shipdate < DATE '1-1-1994' + 1
+                )
+        )
+        AND s_nationkey = n_nationkey
+        AND n_name = 'CANADA'
+    ORDER BY
+        s_name
+        """
+
+
+
 # query = """
 # select
 #       ps_partkey
@@ -127,7 +169,7 @@ primary_key_query = "select * from nation where nation.n_nationkey = 3;"
 # """
 # lst_enable_disable = ["set enable_indexscan = false", "set enable_bitmapscan = false"]
 
-output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + query)[0][0][0]["Plan"]
+output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + q20)[0][0][0]["Plan"]
 
 # db.execute("set enable_indexscan = false")
 # db.execute("set enable_bitmapscan = false")
@@ -325,6 +367,7 @@ class Node():
     # complete
     def node_nested_loop(self):
         relevant_info = {}
+        print(self.information)
         condition = self.information['Join Filter'][1:-1]
         keywords = ["where", "in"]
         for keyword in keywords:
@@ -335,7 +378,7 @@ class Node():
     def print_debug_info(self):
         print("NODE TYPE: {}".format(self.type))
         print("ESTIMATED COST: {}".format(self.get_estimated_cost()))
-        print("MAPPING: {}".format(self.mapping()))
+        # print("MAPPING: {}".format(self.mapping()))
         # print("RELEVANT INFORMATION: \n{}".format(self.get_relevant_info()))
         print("OTHER INFORMATION: {}".format(self.information))
 
@@ -502,6 +545,7 @@ def capture_nodes(dct, parent, subquery_level=0):
 
 
 if __name__ == "__main__":
+    print("in main")
     print("\n######################################################################################################################\n")
     cost_of_scans_and_joins = {}
 
@@ -510,7 +554,8 @@ if __name__ == "__main__":
 
     nodes: list[Node] = capture_nodes(output_plan, None)
     config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
-    AQPs = generate_AQPs(config_para_for_scans)
+    # AQPs = generate_AQPs(config_para_for_scans)
+    AQPs = []
 
     j = 1
     for node in nodes:
