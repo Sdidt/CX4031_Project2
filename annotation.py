@@ -7,7 +7,8 @@ class Annotator:
     def __init__(self, query, decomposed_query, query_component_dict, db: DB, index_column_dict) -> None:
         self.query = query
         self.db = db
-        self.config_paras = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        self.config_paras_scan = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        self.config_paras_join = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
         self.QEP: list[Node] = self.generate_QEP()
         self.AQPs: list[list[Node]] = self.generate_AQPs()
         self.component_mapping = {"subqueries": {}}
@@ -21,17 +22,36 @@ class Annotator:
 
         print("GENERATING AQPS")
 
-        AQPs = {k: None for k in self.config_paras}
-        
-        for each_config in self.config_paras:
+        # AQPs = {k: None for k in self.config_paras_scan}
+        AQPs = {}
+
+        # isolate scans 
+        for each_config in self.config_paras_scan:
             self.db.execute("set {} = false".format(each_config))
 
-        for each_config in self.config_paras:
+        for each_config in self.config_paras_scans:
             self.db.execute("set {} = true".format(each_config))
             AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
             AQP = self.capture_nodes(AQP)
             AQPs[each_config] = AQP
             self.db.execute("set {} = false".format(each_config))
+        
+        for each_config in self.config_paras_scan:
+            self.db.execute("set {} = true".format(each_config))
+
+        # isolate joins
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
+            AQP = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
+            AQP = self.capture_nodes(AQP)
+            AQPs[each_config] = AQP
+            self.db.execute("set {} = false".format(each_config))
+
+        for each_config in self.config_paras_join:
+            self.db.execute("set {} = true".format(each_config))
             
         print("\n######################################################################################################################\n")
 
@@ -100,6 +120,9 @@ class Annotator:
             if "scan" in node.type.lower():
                 cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras)
                 explanation += " because " + choice_explanation
+            elif "join" in node.type.lower() or "nested loop" in node.type.lower():
+                print("FOUND JOIN NODE IN MATCH QUERY")
+                cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)           
             else:
                 explanation += "."
             explanations.append(explanation)
@@ -208,11 +231,68 @@ class Annotator:
             # db.execute("set {} = false".format(each_config))
         print("COST COMPARISON: {}".format(cost_dict))
         choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
-
-        # if "join" in node.type.lower():
-        #     config_para_for_joins = ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
-        #     pass
-
         
         return cost_dict, choice_explanation
 
+    def cost_comparison_join(self, node: Node, config_para_for_join):
+        qep_node = node
+        qep_node_type = node.type
+        placeholder = {}
+
+        return placeholder, str(node.information)
+        # qep_filter = node.information.get("Filter")
+        # if qep_filter is None:
+        #     qep_filter = node.information.get("Index Cond")
+        # qep_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        # cost_dict = {}
+        # cost_dict[qep_node_type] = qep_cost
+        
+        # return cost_dict, choice_explanation
+        # print(config_para_for_join)
+
+        # # enable one each time
+        # for each_config in config_para_for_join:
+        #     print("\n######################################################################################################################\n")   
+        #     print("COMPARING WITH AQP {}".format(each_config)) 
+        #     AQP = self.AQPs[each_config]
+            
+        #     is_bitmap_index_scan = False
+        #     bitmap_index_scan_cond = None
+
+        #     for node in AQP:
+        #         # to find anotherrr forrm of scan
+        #         node.print_debug_info()
+        #         aqp_node_type = node.type
+        #         if node.type == "Bitmap Index Scan":
+        #             is_bitmap_index_scan = True
+        #             bitmap_index_scan_cond = node.information["Index Cond"]
+        #         # if "Relation Name" not in node.information:
+        #         #     print(node.type)
+        #         #     print(node.information)
+        #         if "Relation Name" not in node.information:
+        #             continue
+        #         aqp_filter = None
+        #         aqp_relation = node.information["Relation Name"]
+        #         if qep_filter is not None:
+        #             if is_bitmap_index_scan:
+        #                 aqp_filter = bitmap_index_scan_cond
+        #                 is_bitmap_index_scan = False
+        #                 bitmap_index_scan_cond = None
+        #             aqp_filter = node.information.get("Filter")
+        #             if aqp_filter is None:
+        #                 aqp_filter = node.information.get("Index Cond")
+        #                 if aqp_filter is None:
+        #                     continue
+        #         if qep_filter != aqp_filter:
+        #             print("Condition is not matching!")
+        #             continue
+        #         if "scan" in aqp_node_type.lower() and aqp_relation == qep_relation:
+        #             aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
+        #             cost_dict[aqp_node_type] = aqp_cost
+        #             break
+        #     print("\n######################################################################################################################\n")   
+        #     # db.execute("set {} = false".format(each_config))
+        # print("COST COMPARISON: {}".format(cost_dict))
+        # choice_explanation = self.explain_costs(cost_dict, qep_node_type, qep_cost)
+        
+        # return cost_dict, choice_explanation
