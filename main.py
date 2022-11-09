@@ -212,7 +212,7 @@ if __name__ == "__main__":
     print(preprocessor.query_components)
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(primary_key_query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(primary_key_query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
 
     annotator.annotate_nodes()
 
