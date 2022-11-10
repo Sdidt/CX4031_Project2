@@ -185,6 +185,7 @@ class Node():
         self.children = []
         self.information = None
         self.keywords = None
+        self.join_filter = ""
 
         d = data.copy()
         d.pop("Node Type")
@@ -359,27 +360,69 @@ class Node():
     # complete
     def node_hash_join(self):
         relevant_info = {}
-        condition = self.information['Hash Cond'][1:-1]
-        keywords = ["where", "in"]
-        for keyword in keywords:
-            relevant_info[keyword] = condition
-        self.join_filter = ""
+        if 'Hash Cond' in self.information:
+            condition = self.information['Hash Cond'][1:-1]
+            keywords = ["where", "in"]
+            for keyword in keywords:
+                relevant_info[keyword] = condition
+
+            self.join_filter = condition
         return relevant_info
     
     # TODO: handle case when no join filter is present; drill down to closest index scan/bitmap index scan
     def node_nested_loop(self):
         relevant_info = {}
-        print(self.information)
-        condition = self.information['Join Filter'][1:-1]
-        keywords = ["where", "in"]
-        for keyword in keywords:
-            relevant_info[keyword] = condition
-        self.join_filter = ""
+        # print(self.information)
+        if 'Join Filter' in self.information:
+            condition = self.information['Join Filter'][1:-1]
+            keywords = ["where", "in"]
+            for keyword in keywords:
+                relevant_info[keyword] = condition
+
+            self.join_filter = condition
+        else:
+            print("im here")
+            self.join_filter = self.trace_for_join()
+
         return relevant_info
 
     #TODO: complete this function
     def node_merge_join(self):
-        pass
+        relevant_info = {}
+        # print(self.information)
+        if 'Join Filter' in self.information:
+            condition = self.information['Join Filter'][1:-1]
+            keywords = ["where", "in"]
+            for keyword in keywords:
+                relevant_info[keyword] = condition
+
+            self.join_filter = condition
+        return relevant_info
+
+
+    def trace_for_join(self):
+
+        filter = ""
+        queue = self.create_queue_for_des()
+        for each in queue:
+            if "Index Cond" in self.information:
+                fitler = self.information["Index Cond"]
+                return filter
+
+    def create_queue_for_des(self):
+
+        queue = []
+        queue.append(self)
+        
+        while(len(queue) != 0):
+            first = queue[0]
+            children = first.children
+            for child in children:
+                queue.append(child)
+            queue.pop(0)
+    
+        return queue
+
 
     def print_debug_info(self):
         print("NODE TYPE: {}".format(self.type))

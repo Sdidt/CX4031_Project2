@@ -307,17 +307,17 @@ class Annotator:
     def cost_comparison_join(self, node: Node, config_para_for_join):
         qep_node_type = node.type
         # change this to use node.join_filter instead
-        if qep_node_type == 'Hash Join':
-            qep_filter = node.information["Hash Cond"]
-        elif qep_node_type == 'Nested Loop':
-            qep_filter = node.information["Join Filter"]
-        elif qep_node_type == 'Merge Join':
-            qep_filter = node.information["Join Filter"]
-        else:
-            qep_filter == None
+        # if qep_node_type == 'Hash Join':
+        #     qep_filter = node.information["Hash Cond"]
+        # elif qep_node_type == 'Nested Loop':
+        #     qep_filter = node.information["Join Filter"]
+        # elif qep_node_type == 'Merge Join':
+        #     qep_filter = node.information["Join Filter"]
+        # else:
+        #     qep_filter == None
 
         # USE THIS INSTEAD
-        # qep_filter = node.join_filter
+        qep_filter = node.join_filter
 
         # children = node.children
         # total_cost_of_child = 0
@@ -340,14 +340,15 @@ class Annotator:
                 # to find another forrm of scan
                 node.print_debug_info()
                 aqp_node_type = node.type
-                if aqp_node_type == "Hash Join":
-                    aqp_filter = node.information["Hash Cond"]
-                elif aqp_node_type == "Nested Loop":
-                    aqp_filter = node.information["Join Filter"]
-                elif aqp_node_type == "Merge Join":
-                    aqp_filter = node.information["Join Filter"]
-                else:
-                    aqp_filter = None
+                aqp_filter = node.join_filter
+                # if aqp_node_type == "Hash Join":
+                #     aqp_filter = node.information["Hash Cond"]
+                # elif aqp_node_type == "Nested Loop":
+                #     aqp_filter = node.information["Join Filter"]
+                # elif aqp_node_type == "Merge Join":
+                #     aqp_filter = node.information["Join Filter"]
+                # else:
+                #     aqp_filter = None
          
                 if qep_filter != aqp_filter:
                     print("Condition is not matching!")
