@@ -186,6 +186,7 @@ class Node():
         self.information = None
         self.keywords = None
         self.join_filter = ""
+        self.index_name = None
 
         d = data.copy()
         d.pop("Node Type")
@@ -378,6 +379,7 @@ class Node():
     # TODO: handle case when no join filter is present; drill down to closest index scan/bitmap index scan
     def node_nested_loop(self):
         relevant_info = {}
+        index_name = None
         # print(self.information)
         if 'Join Filter' in self.information:
             condition = self.information['Join Filter'][1:-1]
@@ -387,8 +389,9 @@ class Node():
 
             self.join_filter = condition
         else:
+            self.type = "Index Nested Loop"
             print("im here")
-            self.join_filter = self.trace_for_join()
+            self.join_filter, self.index_name = self.trace_for_join()
             print("Extraced join filter: {}".format(self.join_filter))
 
         return relevant_info
@@ -421,7 +424,8 @@ class Node():
             if "Index Cond" in node.information:
                 filter:str = node.information["Index Cond"][1:-1]
                 filter = " = ".join(filter.split(" = ")[::-1])
-                return filter
+                index_name = node.information["Index Name"]
+                return filter,index_name
             queue.pop(0)
         return filter
 
