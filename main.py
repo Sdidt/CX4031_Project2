@@ -248,7 +248,7 @@ if __name__ == "__main__":
     #     """
 
     print("Hello")
-    preprocessor = PreProcessor(simple_query, db)
+    preprocessor = PreProcessor(query, db)
 
     print("\n######################################################################################################################\n")
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     print()
     print(preprocessor.decomposed_query)
 
-    annotator = Annotator(simple_query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
 
     print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
     annotator.annotate_nodes()

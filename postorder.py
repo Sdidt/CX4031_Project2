@@ -205,13 +205,17 @@ class Node():
 
     def get_estimated_cost(self):
         # startup_cost = self.information["Startup Cost"]
+        qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
+        if self.type == "Merge Join" or self.type == "Nested Loop":
+            return qep_cost
         children: list[Node] = self.children
         total_cost_of_child = 0
         for child in children:
             total_cost_of_child += child.information["Total Cost"] * child.information["Actual Loops"]
 
-        qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
         diff = qep_cost - total_cost_of_child
+        if diff < 0:
+            return qep_cost
         return diff
 
     def mapping(self):
@@ -234,6 +238,8 @@ class Node():
             pass
         elif self.type == "Nested Loop":
             self.keywords = self.node_nested_loop()
+        elif self.type == "Merge Join":
+            self.keywords = self.node_merge_join()
         elif self.type == "Aggregate":
             self.keywords = self.node_aggregate()
         elif "Sort" in self.type:
@@ -383,6 +389,7 @@ class Node():
         else:
             print("im here")
             self.join_filter = self.trace_for_join()
+            print("Extraced join filter: {}".format(self.join_filter))
 
         return relevant_info
 
@@ -390,24 +397,33 @@ class Node():
     def node_merge_join(self):
         relevant_info = {}
         # print(self.information)
-        if 'Join Filter' in self.information:
-            condition = self.information['Join Filter'][1:-1]
+        if 'Merge Cond' in self.information:
+            condition = self.information['Merge Cond'][1:-1]
             keywords = ["where", "in"]
             for keyword in keywords:
                 relevant_info[keyword] = condition
 
             self.join_filter = condition
+            print("Extraced merge condition: {}".format(self.join_filter))
         return relevant_info
 
 
     def trace_for_join(self):
-
+        print("BEGIN TRACE")
         filter = ""
-        queue = self.create_queue_for_des()
-        for each in queue:
-            if "Index Cond" in self.information:
-                fitler = self.information["Index Cond"]
+        # queue:list[Node] = self.create_queue_for_des()
+        queue = [self]
+        while(len(queue) != 0):
+            node = queue[0]
+            children = node.children
+            queue.extend(children)
+            node.print_debug_info()
+            if "Index Cond" in node.information:
+                filter:str = node.information["Index Cond"][1:-1]
+                filter = " = ".join(filter.split(" = ")[::-1])
                 return filter
+            queue.pop(0)
+        return filter
 
     def create_queue_for_des(self):
 
@@ -419,7 +435,7 @@ class Node():
             children = first.children
             for child in children:
                 queue.append(child)
-            queue.pop(0)
+            # queue.pop(0)
     
         return queue
 

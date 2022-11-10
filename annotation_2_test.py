@@ -88,6 +88,8 @@ class Annotator:
         if not cur.parent[0] is None:
             cur.parent[0].add_child(cur)
 
+        cur.mapping()
+
         return nodes
 
     def generate_QEP(self):
@@ -182,11 +184,11 @@ class Annotator:
                 if "scan" in node.type.lower():
                     print("FOUND SCAN NODE IN MATCH QUERY")
                     cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras_scan)
-                    explanation += " because " + choice_explanation
+                    explanation += choice_explanation
                 elif "join" in node.type.lower() or "nested loop" in node.type.lower():
                     print("FOUND JOIN NODE IN MATCH QUERY")
                     cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)   
-                    explanation += " because " + choice_explanation        
+                    explanation += choice_explanation        
                 else:
                     explanation += "."
                 # explanations.append(explanation)
@@ -201,13 +203,13 @@ class Annotator:
     
     def annotate_nodes(self):
         for node in self.QEP:
-            node.mapping()
+            # node.mapping()
             node.print_debug_info()
             self.find_match_in_decomposed_query(node)
 
     def explain_costs(self, cost_dict, qep_node_type, qep_cost):
         if len(cost_dict) == 1:
-            return "no other option is available."
+            return " because no other option is available."
         ratios = {}
         anomalous_ratios = {}
         for node_type, cost in cost_dict.items():
@@ -218,14 +220,16 @@ class Annotator:
                 ratios[node_type] = ratio
             else:   
                 anomalous_ratios[node_type] =  1 / ratio
+        if len(ratios) == 0:
+            choice_explanation += "."
         if len(ratios) == 1:
-            choice_explanation = "it requires " + "{:.2f}".format(list(ratios.values())[0]) + " less operations than " + "{}".format(list(ratios.keys())[0]) + "."
-        else:
-            choice_explanation = "it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
+            choice_explanation = " because it requires " + "{:.2f}".format(list(ratios.values())[0]) + " less operations than " + "{}".format(list(ratios.keys())[0]) + "."
+        elif len(ratios) > 1:
+            choice_explanation = " because it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
         if len(anomalous_ratios) == 1:
-            choice_explanation += "However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less than " + node_type + "."
+            choice_explanation += " However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less operations than " + node_type + "."
         elif len(anomalous_ratios) > 1:
-            choice_explanation += "However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less than " + node_type + "."
+            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + node_type + "."
         return choice_explanation
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
@@ -341,6 +345,7 @@ class Annotator:
                 node.print_debug_info()
                 aqp_node_type = node.type
                 aqp_filter = node.join_filter
+                print("JOIN FILTER: {}".format(aqp_filter))
                 # if aqp_node_type == "Hash Join":
                 #     aqp_filter = node.information["Hash Cond"]
                 # elif aqp_node_type == "Nested Loop":
@@ -363,7 +368,6 @@ class Annotator:
                         # aqp_cost = node.information["Total Cost"] * node.information["Actual Loops"]
                         aqp_cost = node.get_estimated_cost()
                         # node_cost = aqp_cost - total_cost_of_child
-                        cost_dict = {}
                         cost_dict[aqp_node_type] = aqp_cost
                         break
             print("\n######################################################################################################################\n")   
