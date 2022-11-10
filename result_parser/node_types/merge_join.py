@@ -1,15 +1,15 @@
 from postorder import Node
-
+import re
 
 def merge_join_define(node : Node, condition,index_column_dict):
-    result = "The results from sub-operations are joined using Merge Join"
+    result = "The clause " + condition + " performs a Merge Join "
 
     if "Merge Cond" in node.information:
-        result += " with condition " + node.information["Merge Cond"].replace("::text", "")
+        merge_cond = node.information["Merge Cond"]
+        relation_list = re.findall("([a-zA-Z0-9]+)\." ,merge_cond)
+        result += "between table "+ relation_list[0] + "and table " + relation_list[1] + " with the merge condition of " + node.information["Merge Cond"]
         
+    if "Join Filter" in node.information:
+        result += " and a filter condition of " + node.information["Merge Cond"].replace("::bpchar", "")
 
-    if "Join Type" == "Semi":
-        result += " but only the row from the left relation is returned"
-
-    result += "."
     return result

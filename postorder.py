@@ -543,6 +543,10 @@ def capture_nodes(dct, parent, subquery_level=0):
 
 
 if __name__ == "__main__":
+
+    #db.execute("set enable_seqscan = false")
+    #db.execute("set enable_hashjoin = false")
+    #db.execute("set enable_nestloop = false")
     output_plan = db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + q20)[0][0][0]["Plan"]
     print("in main")
     print("\n######################################################################################################################\n")
@@ -553,8 +557,8 @@ if __name__ == "__main__":
 
     nodes: list[Node] = capture_nodes(output_plan, None)
     config_para_for_scans = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
-    # AQPs = generate_AQPs(config_para_for_scans)
-    AQPs = []
+    AQPs = generate_AQPs(config_para_for_scans)
+    # AQPs = []
 
     j = 1
     for node in nodes:

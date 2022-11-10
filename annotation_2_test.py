@@ -3,6 +3,9 @@ from difflib import SequenceMatcher
 from connection import DB
 from functools import reduce 
 import operator
+from result_parser.result_parser import ResultParser
+from result_parser.node_types.default_node import default_define
+
 
 
 def getFromDict(dataDict, mapList):
@@ -12,7 +15,7 @@ def setInDict(dataDict, mapList, value):
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
 
 class Annotator:
-    def __init__(self, query, decomposed_query, query_component_dict, db: DB) -> None:
+    def __init__(self, query, decomposed_query, query_component_dict, db: DB,index_column_dict ) -> None:
         self.query = query
         self.db = db
         self.config_paras = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
@@ -21,6 +24,8 @@ class Annotator:
         self.component_mapping: dict = {}
         self.decomposed_query: dict = decomposed_query
         self.query_component_dict: dict = query_component_dict
+        self.result_parser =  default_define
+        self.index_column_dict = index_column_dict
 
     def generate_AQPs(self):
         print("\n######################################################################################################################\n")
@@ -157,7 +162,9 @@ class Annotator:
                     condition = "\"" + last_key + " " + optimal_clause + "\""
                 # conditions.append(condition)
                 # original_query_components.append(original_query_component)
-                explanation = "The clause " + condition + " is implemented using " + node.type
+                self.result_parser = ResultParser.results_map.get(node.type, default_define)
+                explanation =  self.result_parser(node,condition,self.index_column_dict)
+                #explanation = "The clause " + condition + " is implemented using " + node.type
                 if "scan" in node.type.lower():
                     cost_dict, choice_explanation = self.cost_comparison_scan(node, self.config_paras)
                     explanation += " because " + choice_explanation

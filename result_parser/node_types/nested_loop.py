@@ -1,16 +1,16 @@
 from postorder import Node
+import re
 
+## Ideally want to identify the 2 tables that are doing the nested looped Join and what is their Join Filter.
 def nested_loop_define(node : Node, condition,index_column_dict):
-    join_filter = node.information["Join Filter"]
-    result = "The rows are sorted based on their keys."
+    join_type = node.information["Join Type"]
+  ## if dont have join filter, then have its an index nested loop join.
+    if(node.information["Join Filter"]):
+        join_filter = node.information["Join Filter"]
+        relation_list = re.findall("([a-zA-Z0-9]+)\." ,join_filter)
+        print("HElloooo")
+        print(relation_list)
+        result = "The clause " + condition + " is a " + join_type + " nested loop join between table " + relation_list[0] + " and table " + relation_list[1] + " based on the filter " + join_filter
 
-    if(join_filter):
-        result = "The join results between the nested loop scans of the suboperations are returned as new rows."
-
-
-
-    else : 
-        result = "The join results between the nested loop scans of the suboperations are returned as new rows."
-
-
+    
     return result

@@ -11,6 +11,7 @@ class PreProcessor:
         print("Inside init")
         self.query = query
         self.db = db
+        self.index_column_dict = {}
         self.parser = Parser(self.query)
         self.tokens = self.parser.tokens
         self.tables = self.parser.tables
@@ -69,6 +70,23 @@ class PreProcessor:
             for val in result:
                 self.all_column_names[val[3]] = table
         print(self.all_column_names)
+        ## Get Index columns
+        index_columns = self.db.execute("SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname")
+        print("----------------------RESULTS-------------------------------------")
+        print(index_columns)
+        for index in index_columns:
+            table = index[0]
+            index_name = index[1]
+            create_index = index[2].split("public.",1)[1]
+            mk1 = create_index.find('(') + 1
+            mk2 = create_index.find(')', mk1)
+            column_name = create_index[ mk1 : mk2 ]
+            print("This is create_index :")
+            print(column_name)
+            print(table)
+            print(index_name)
+            self.index_column_dict[index_name] = [table,column_name]
+
     
     def get_relations(self):
         return self.parser.tables
