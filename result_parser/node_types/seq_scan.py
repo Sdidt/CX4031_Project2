@@ -10,8 +10,7 @@ def seq_scan_define(node : Node, condition,index_column_dict):
             result += " with an alias of {}".format(node.information["Alias"])
     if "Filter" in node.information:
         result += " and filtered with the condition {}".format(
-            node.information["Filter"].replace("::text", "")
+            node.information["Filter"].replace("::bpchar", "")
         )
-    result += "."
 
     return result

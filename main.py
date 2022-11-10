@@ -261,8 +261,8 @@ if __name__ == "__main__":
     print("Decomposed Query:")
     print()
     print(preprocessor.decomposed_query)
-
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db)
+    print(preprocessor.index_column_dict)
+    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
 
     annotator.annotate_nodes()
 
