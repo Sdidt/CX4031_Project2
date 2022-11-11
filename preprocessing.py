@@ -119,12 +119,12 @@ class PreProcessor:
 
     def handle_as_keyword(self, curr_query, curr_component: list, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
         if t.value not in curr_query:
-            curr_query[t.value] = {}
+            curr_query[t.value.lower()] = {}
         aggregate = curr_query[last_keyword_token.value][-1]
         i += 1
         alias: token.SQLToken = tokens[i]
         curr_component.append(alias.value.lower())
-        curr_query[t.value][alias.value.lower()] = aggregate
+        curr_query[t.value.lower()][alias.value.lower()] = aggregate
         last_comma_index = i + 1
         return curr_query, i, last_comma_index, curr_component
 
@@ -132,7 +132,7 @@ class PreProcessor:
     def handle_table_name(self, curr_query, tokens, t:token.SQLToken, i, last_keyword_token:token.SQLToken, last_comma_index):
         if (t in self.tables):
             table = t
-            curr_query[last_keyword_token.value].append(table.value.lower())
+            curr_query[last_keyword_token.value.lower()].append(table.value.lower())
             # alias cases
             i += 1
             t = tokens[i]
@@ -230,7 +230,7 @@ class PreProcessor:
         # print(tok_lst)
         raw_clause_lst.append(raw_clause)
         clause_list.append(" ".join(tok_lst))
-        curr_query[last_keyword_token.value] = clause_list
+        curr_query[last_keyword_token.value.lower()] = clause_list
         # print("final raw tokens")
         # print(raw_clause_lst)
         return curr_query, raw_clause_lst
@@ -260,7 +260,7 @@ class PreProcessor:
     def collapse_from_last_comma(self, curr_query, last_comma_index, last_keyword_token: token.SQLToken, tokens, i, curr_level):
         if last_comma_index is not None and last_comma_index != i:
             token_lst = [self.replace_alias_with_expression(curr_query, self.prepend_table_name_to_column(curr_query, t, curr_level)).value.lower() for t in tokens[last_comma_index + 1: i]]
-            curr_query[last_keyword_token.value].append("".join(token_lst))
+            curr_query[last_keyword_token.value.lower()].append("".join(token_lst))
         return curr_query, last_comma_index
 
     def extract_keywords(self, tokens, decomposed_query, query_components, parenthesis_level=0, curr_level=0, query_alias="query_1"):
@@ -287,7 +287,7 @@ class PreProcessor:
             if (t.value.lower() == ";"):
                 semicolon_present = True
                 curr_query, last_comma_index = self.collapse_from_last_comma(curr_query, last_comma_index, last_keyword_token, tokens, i, curr_level)
-                curr_query_components[last_keyword_token.value] = " ".join(curr_component)
+                curr_query_components[last_keyword_token.value.lower()] = " ".join(curr_component)
                 last_comma_index = i
                 print("Done processing the query!")
                 i += 1
@@ -310,7 +310,7 @@ class PreProcessor:
                         # print("Reached desc/asc")
                         curr_query["order by"][-1] += " " + t.value.lower()
                         if (last_keyword_token is not None):
-                            curr_query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
+                            curr_query_components[last_keyword_token.value.lower()] = " ".join(curr_component[:-1])
                         # print(curr_query)
                         i += 1
                         continue
@@ -320,11 +320,11 @@ class PreProcessor:
                         i += 1
                         continue
 
-                    curr_query[t.value] = []
-                    curr_query_components[t.value] = []
+                    curr_query[t.value.lower()] = []
+                    curr_query_components[t.value.lower()] = []
 
                     if (last_keyword_token is not None):
-                        curr_query_components[last_keyword_token.value] = " ".join(curr_component[:-1])
+                        curr_query_components[last_keyword_token.value.lower()] = " ".join(curr_component[:-1])
 
                     curr_component = curr_component[-1:]
                     last_keyword_token = t
@@ -425,7 +425,7 @@ class PreProcessor:
             curr_query, last_comma_index = self.collapse_from_last_comma(curr_query, last_comma_index, last_keyword_token, tokens, i, curr_level)
             last_comma_index = i
             if (last_keyword_token is not None):
-                curr_query_components[last_keyword_token.value] = " ".join(curr_component)
+                curr_query_components[last_keyword_token.value.lower()] = " ".join(curr_component)
 
         if ("order by" in curr_query):
             if (curr_query["order by"][-1] not in ["asc", "desc"]):

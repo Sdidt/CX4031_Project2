@@ -216,6 +216,8 @@ class Annotator:
                 ratios[node_type] = ratio
             else:   
                 anomalous_ratios[node_type] =  1 / ratio
+        print(ratios)
+        print(anomalous_ratios)
         if len(ratios) == 0:
             choice_explanation += "."
         if len(ratios) == 1:
@@ -223,9 +225,9 @@ class Annotator:
         elif len(ratios) > 1:
             choice_explanation = " because it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
         if len(anomalous_ratios) == 1:
-            choice_explanation += " However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + str(list(anomalous_ratios.values())[0]) + " less operations than " + node_type + "."
+            choice_explanation += " However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + "{:.2f}".format(list(anomalous_ratios.values())[0]) + " less operations than " + qep_node_type + "."
         elif len(anomalous_ratios) > 1:
-            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + node_type + "."
+            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + qep_node_type + "."
         return choice_explanation
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
@@ -236,7 +238,7 @@ class Annotator:
         # if qep_filter is None:
         #     qep_filter = qep_node.information.get("Index Cond")
         qep_filter = qep_node.scan_filter
-
+        print("SCAN FILTER: {}".format(qep_filter))
         qep_cost = qep_node.get_estimated_cost()
         cost_dict = {}
         cost_dict[qep_node_type] = qep_cost
@@ -251,25 +253,31 @@ class Annotator:
 
             for node in AQP:
                 # to find anotherrr forrm of scan
-                # node.print_debug_info()
+                node.print_debug_info()
                 aqp_node_type = node.type
                 if node.type == "Bitmap Index Scan":
                     is_bitmap_index_scan = True
                     bitmap_index_scan_cond = node.information["Index Cond"]
                 if "Relation Name" not in node.information:
                     continue
-                aqp_filter = None
+                aqp_filter = node.scan_filter
                 aqp_relation = node.information["Relation Name"]
-                if qep_filter is not None:
-                    if is_bitmap_index_scan:
-                        aqp_filter = bitmap_index_scan_cond
-                        is_bitmap_index_scan = False
-                        bitmap_index_scan_cond = None
-                    aqp_filter = node.information.get("Filter")
-                    if aqp_filter is None:
-                        aqp_filter = node.information.get("Index Cond")
-                        if aqp_filter is None:
-                            continue
+                if is_bitmap_index_scan:
+                    aqp_filter = bitmap_index_scan_cond[1:-1]
+                    is_bitmap_index_scan = False
+                    bitmap_index_scan_cond = None
+                # if qep_filter is not None:
+                #     if is_bitmap_index_scan:
+                #         aqp_filter = bitmap_index_scan_cond
+                #         is_bitmap_index_scan = False
+                #         bitmap_index_scan_cond = None
+                #     aqp_filter = node.information.get("Filter")[1:-1]
+                #     if aqp_filter is None:
+                #         aqp_filter = node.information.get("Index Cond")[1:-1]
+                #         if aqp_filter is None:
+                #             continue
+                print("AQP Node: {}".format(aqp_node_type))
+                print("AQP filter: {}".format(aqp_filter))
                 if qep_filter != aqp_filter:
                     # print("Condition is not matching!")
                     continue

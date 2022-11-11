@@ -33,7 +33,7 @@ class Node():
     def get_estimated_cost(self):
         # startup_cost = self.information["Startup Cost"]
         qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
-        if self.type == "Merge Join" or self.type == "Nested Loop":
+        if self.type in ["Merge Join", "Nested Loop", "Index Nested Loop", "Bitmap Heap Scan"]:
             return qep_cost
         children: list[Node] = self.children
         total_cost_of_child = 0
@@ -199,7 +199,6 @@ class Node():
             self.join_filters = [condition, self.revert_condition(condition)]
         return relevant_info
     
-    # TODO: handle case when no join filter is present; drill down to closest index scan/bitmap index scan
     def node_nested_loop(self):
         relevant_info = {}
         # print(self.information)
@@ -217,7 +216,6 @@ class Node():
 
         return relevant_info
 
-    #TODO: complete this function
     def node_merge_join(self):
         relevant_info = {}
         # print(self.information)
