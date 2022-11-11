@@ -157,7 +157,7 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
             # print(nested_dict_keys[j])
             if (nested_dict_keys[j] == "subqueries"):
                 subquery_dict_array, div_components = recursive_display(nested_dict_values[j], div_components, title_padding + 10, table_padding + 10)
-                print(div_components)
+                # print(div_components)
             else:
                 dict_temp_array = nested_dict_values[j]
                 dict_temp_str = ""
@@ -185,7 +185,7 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
                     },
                     style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"})
         div_components.append(div_component) 
-    print(div_components)
+    # print(div_components)
     return dict_array, div_components 
 
 def toggle_modal(n1, is_open):
@@ -231,12 +231,12 @@ def update_output(n_clicks, value):
         query_output = process_query(value)
         div_components = []
         lst_curr_object, div_components = recursive_display(query_output)
-        print("FINAL RESULT: {}".format(div_components))
+        # print("FINAL RESULT: {}".format(div_components))
         html_output = div_components
-        print("HTML OUTPUT: {}".format(html_output))
+        # print("HTML OUTPUT: {}".format(html_output))
         print("done executing")
-        print(html_output)
-        return html.Div(div_components)
+        # print(html_output)
+        return html.Div(html_output)
 
 if __name__ == '__main__':
     app.run_server(debug=True)

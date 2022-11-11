@@ -515,7 +515,9 @@ if __name__ == "__main__":
     ORDER BY
         s_name
         """
-
+    where_subquery = """
+    select * from part where p_brand = 'Brand#13' and p_size <> (select max(p_size) from part);
+    """
 
     db = DB()
 
