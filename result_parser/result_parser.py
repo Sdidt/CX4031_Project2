@@ -13,6 +13,7 @@ class ResultParser(object):
     results_map = {
         "Aggregate": aggregate_define,
         "Nested Loop": nested_loop_define,
+        "Index Nested Loop": nested_loop_define,
         "Seq Scan": seq_scan_define,
         "Hash": hash_define,
         "Hash Join": hash_join_define,

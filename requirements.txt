@@ -5,3 +5,4 @@ sqlparse
 sql-metadata
 dash
 dash_bootstrap_components
+pytermgui
