@@ -6,31 +6,59 @@ from driver import process_query
 # from pytermgui import auto, keys
 
 # dict_ = {'key 1': 'value 1', 'key 2': 'value 2', 'key 3': 'value 3'}
-app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP]) 
 
-heading = html.Div(style={'backgroundColor': 'black', 'height': 110, 'width': '100%'}, children=[
-                # Title
-                html.H1(
-                    children='Project 2',
-                    style={'textAlign': 'center', 'color': 'white', 'padding':5}
-                ),
-                # Title Description
-                html.Div(
-                    children='Dash: A web application framework for Python.', 
-                    style={'textAlign': 'center','color': 'white'
-                })
-            ])
+modal = html.Div([
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Visual Plan - Detailed View")),
+                dbc.ModalBody("This is for visual plan."),
+            ],
+            id="modal-visual",
+            size="lg",
+            is_open=False,
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("About")),
+                dbc.ModalBody("This is a CZ4032 Database System Principles Project."),
+            ],
+            id="modal-about",
+            size="lg",
+            is_open=False,
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Datasets")),
+                dbc.ModalBody("In this project, datasets name TPC-H are loaded into PostgreSQL RDBMS."),
+            ],
+            id="modal-datasets",
+            size="lg",
+            is_open=False,
+        ),
+])
+
+heading = dbc.NavbarSimple(
+    children=[
+        dbc.NavItem(dbc.NavLink("About", href="#", id="aboutLink", style={'color':'lightsteelblue', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "17px"})),
+        dbc.NavItem(dbc.NavLink("Datasets", href="#", id="datasetsLink", style={'color':'lightsteelblue', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "17px"})),
+    ],
+    brand="Project 2",
+    brand_style={'color':'lightsteelblue', 'font-weight' : 'bold', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"},
+    color="dark"
+)
 
 sql_query_div = html.Div(children=[
-                            dbc.Label("SQL Query"),
+                            dbc.Label("SQL Query",
+                            style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
                             dcc.Textarea(
                                 id='textarea-sql-query',
                                 placeholder='Enter your SQL query here.',
-                                style={'width': '100%', 'height': 230, 'resize': 'none'},
+                                style={'width': '100%', 'height': 230, 'resize': 'none','font-size' :"18px"},
                             ),
                             html.Br(),
                             dbc.Button('Submit', id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right'}
+                                        style={'float': 'right', 'font-size' : '17px'}
                                         ),
                         ], 
                             style={'width': '35%', 'height': 250},
@@ -59,23 +87,23 @@ natural_language_div = html.Div(children=[
                         )
 
 visualization_div = html.Div([
-                        dbc.Label("Visualize Plan"),
+                        dbc.Label("Visualize Plan",
+                        style={"font-size" : "20px"}),
                         dcc.Textarea(
                                 id='graph-nl-steps',
-                                value='show flowchart here',
-                                style={'width': '100%', 'height': 230, 'resize': 'none'},
+                                placeholder='show flowchart here',
+                                style={'width': '100%', 'height': 230, 'resize': 'none', "font-size" : "18px"},
                                 readOnly=True
                             ),
                         html.Br(),
                         dbc.Button('Detailed View', outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right', 'margin-bottom': 10}
-                                        ),
+                                        style={'float': 'right', 'margin-bottom': 10, "font-size" : "17px"}, id="visualButton"),
                     ],
-                        style={'padding-top': 50, 'width': '35%', 'padding-left': 10}
+                        style={'padding-top': 50, 'width': '35%', 'padding-left': 10, "font-family" : "Mach OT W03 Condensed Medium"}
                     )
 body_right = html.Div([
-            dbc.Label("Natural Language Description"),
-            html.Div(children=[], id="table1", style={'width': '100%'})
+            dbc.Label("Natural Language Description", style={"font-size" : "20px"}),
+            html.Div(children=[], id="table1", style={'width': '100%', "font-size" : "18px"})
             ], 
             style={'width': '65%', 'height': 250, 'padding-left': 20}
 )
@@ -84,7 +112,8 @@ body_top_left = html.Div(children=[
                     sql_query_div,
                     body_right
                 ],
-                style={'width': '100%', 'display': 'flex','padding-top':30, 'padding-left': 10, 'padding-right': 10}
+                style={'width': '100%', 'display': 'flex','padding-top':30, 'padding-left': 10, 'padding-right': 10, 
+                "font-family" : "Mach OT W03 Condensed Medium"}
                 )
 
 
@@ -93,6 +122,7 @@ body_left = html.Div(children=[body_top_left, visualization_div], style={'width'
 
 
 app.layout = html.Div(children=[
+                modal,
                 heading,
                 body_left
             ])
@@ -142,7 +172,7 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
         # print(div_components)
         div_component = dash_table.DataTable(data=dict_array, 
                     style_table={
-                        'padding-left': table_padding,
+                        'padding-left': 20,
                         'padding-bottom': 10,
                         'width': 'auto',
                         'max-height': '580px', 
@@ -150,12 +180,35 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
                     },
                     style_data={
                     'whiteSpace': 'pre-line',
-                    'height': 'auto'
+                    'height': 'auto',
                     },
-                    style_cell={'textAlign': 'left'})
+                    style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"})
         div_components.append(div_component) 
     print(div_components)
     return dict_array, div_components 
+
+def toggle_modal(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+app.callback(
+    Output("modal-about", "is_open"),
+    Input("aboutLink", "n_clicks"),
+    State("modal-about", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("modal-datasets", "is_open"),
+    Input("datasetsLink", "n_clicks"),
+    State("modal-datasets", "is_open"),
+)(toggle_modal) 
+
+app.callback(
+    Output("modal-visual", "is_open"),
+    Input("visualButton", "n_clicks"),
+    State("modal-visual", "is_open"),
+)(toggle_modal) 
 
 
 @app.callback(
