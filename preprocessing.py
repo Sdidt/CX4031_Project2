@@ -3,8 +3,18 @@ import copy
 from connection import DB
 
 class PreProcessor:
+    """
+     A class the converts input SQL query string into a decomposed query, and query component mapping dictionary. 
+    """
 
     def __init__(self, query, db) -> None:
+        """
+        Constructor to initialize the relevant components of the Preprocessor
+
+        Parameter query: input SQL query string
+
+        Parameter db: db connection instance
+        """
         # self.query_split = sqlparse.split(query)[0] # assuming only 1 query at a time
         # self.query_split = sqlparse.format(query, reindent=True, keyword_case="upper").splitlines()
         # self.query = self.clean(self.query_split)
@@ -37,12 +47,22 @@ class PreProcessor:
         self.decomposed_query, self.query_components = self.extract_keywords(self.tokens, {"query_1": {"subqueries": {}}}, {"query_1": {"subqueries": {}}})
 
     def clean(self, query_split):
+        """
+        Clean input split up SQL query
+
+        Parameter query_split: split up SQL query
+        """
         reconstructed_query = ""
         for clause in query_split:
             reconstructed_query += ' {}'.format(clause.strip())
         return reconstructed_query
         
     def print_token_debug_info(self, t:token.SQLToken):
+        """
+        Print debug information for token
+
+        Parameter t: current token being processed
+        """
         print("Value: " + str(t.value))
         print(t.is_keyword)
         print("Different types: ")
@@ -59,6 +79,9 @@ class PreProcessor:
         print("Parenthesis level: " + str(t.parenthesis_level))
 
     def get_metadata(self):
+        """
+        Get all requried metadata. This includes relation names, column names, and indexes. 
+        """
         result = self.db.execute("select table_name from information_schema.tables where table_schema='public';")
         self.all_column_names = {}
         self.all_table_names = [res[0] for res in result]
@@ -84,19 +107,36 @@ class PreProcessor:
             print(table)
             print(index_name)
             self.index_column_dict[index_name] = [table,column_name]
-
     
     def get_relations(self):
+        """
+        Get all relation names from SQL input query 
+        """
         return self.parser.tables
 
     def get_columns(self):
+        """
+        Get all column names from SQL input query 
+        """
         return self.parser.columns, [column[column.find(".") + 1:] if column.find(".") != -1 else column for column in self.parser.columns]
     
     def get_column_to_table_mapping(self):
+        """
+        Map column names to tables to enrich SQL clauses
+        """
         query_columns = {column: self.all_column_names[column] if column not in ['*', 'UNITS'] else column for column in self.columns}
         return query_columns
 
     def prepend_table_name_to_column(self, curr_query, t: token.SQLToken, curr_level):
+        """
+        Prepend table name to column
+
+        Parameter curr_query: current decomposed query 
+
+        Parameter t: current token being processed
+
+        Parameter curr_level: current level of query
+        """
         # table name already present
         if "." in t.value.lower():
             return t
@@ -114,10 +154,30 @@ class PreProcessor:
         return t
 
     def print_query_debug_info(self):
+        """
+        Print debug information for query
+        """
         for t in self.tokens:
             self.print_token_debug_info(t)
 
     def handle_as_keyword(self, curr_query, curr_component: list, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
+        """
+        Handle the "as" keyword when encountered in the inpur query
+
+        Parameter curr_query: current decomposed query 
+
+        Parameter curr_component: current query component dictionary
+
+        Parameter tokens: extracted SQL query tokens
+
+        Parameter t: current token being processed
+
+        Parameter i: current index while parsing the SQL query tokens
+        
+        Parameter last_comma_index: last comma index
+
+        Parameter last_keyword_token: last keyword token
+        """
         if t.value not in curr_query:
             curr_query[t.value.lower()] = {}
         aggregate = curr_query[last_keyword_token.value.lower()][-1]
@@ -142,6 +202,13 @@ class PreProcessor:
                 curr_query, i, last_comma_index = self.handle_as_keyword(curr_query, tokens, t, i, last_keyword_token, last_comma_index)   
 
     def replace_alias_with_expression(self, curr_query, t: token.SQLToken):
+        """
+        Replace aliases appearing in a query with the corresponding full form. Helps in annotation.
+
+        Parameter curr_query: current query component
+
+        Parameter t: current token being processed
+        """
         if "as" not in curr_query:
             return t
         if t.value.lower() in curr_query["as"]:
@@ -149,6 +216,21 @@ class PreProcessor:
         return t
 
     def extract_where_having(self, curr_query, query_components, clause_tokens, clause_list: list, last_keyword_token: token.SQLToken, query_alias, curr_level):
+        """
+        Extract clauses from where/having tokens
+
+        Parameter curr_query: current query component
+
+        Parameter query_components: current query components
+
+        Parameter clause_tokens: extracted where/having clause tokens
+
+        Parameter last_keyword_token: last keyword token
+
+        Parameter query_alias: alias for current query
+        
+        Parameter curr_level: current level of query
+        """
         i = 0
         last_index = i
         curr_clause_not = False
@@ -236,6 +318,25 @@ class PreProcessor:
         return curr_query, raw_clause_lst
 
     def extract_subquery(self, curr_query, query_components, tokens, i, last_keyword_token: token.SQLToken, t: token.SQLToken, subquery_number, subquery_level):
+        """
+        Extract keywords from subquery (recursively)
+
+        Parameter curr_query: current query component
+
+        Parameter query_components: current query components
+
+        Parameter tokens: extracted SQL query tokens
+
+        Parameter i: current index while parsing the SQL query tokens
+
+        Parameter last_keyword_token: last keyword token
+
+        Parameter t: current token being processed
+        
+        Parameter subquery_number: number of new subquery under current query being processed
+
+        Parameter subquery_level: subquery level for subquery to be extracted
+        """
         subquery_tokens = []
         # a ')' with same parenthesis level as parent query marks end of subquery
         while t.value != ")" or t.parenthesis_level != last_keyword_token.parenthesis_level: 
@@ -258,12 +359,42 @@ class PreProcessor:
         return curr_query, query_components, i, subquery_alias
 
     def collapse_from_last_comma(self, curr_query, last_comma_index, last_keyword_token: token.SQLToken, tokens, i, curr_level):
+        """
+        Collapse tokens from the last comma/token that can be perceived as a comma
+
+        Parameter curr_query: current decomposed query 
+
+        Parameter last_comma_index: last comma index
+
+        Parameter last_keyword_token: last keyword token
+
+        Parameter tokens: extracted SQL query tokens
+
+        Parameter i: current index while parsing the SQL query tokens
+        
+        Parameter curr_level: current level of query/subquery (where 0 represents highest level query)
+        """
         if last_comma_index is not None and last_comma_index != i:
             token_lst = [self.replace_alias_with_expression(curr_query, self.prepend_table_name_to_column(curr_query, t, curr_level)).value.lower() for t in tokens[last_comma_index + 1: i]]
             curr_query[last_keyword_token.value.lower()].append("".join(token_lst))
         return curr_query, last_comma_index
 
     def extract_keywords(self, tokens, decomposed_query, query_components, parenthesis_level=0, curr_level=0, query_alias="query_1"):
+        """
+        Extract keywords from extracted SQL query tokens
+
+        Parameter tokens: extracted SQL query tokens
+
+        Parameter decomposed_query: preliminary decomposed query
+
+        Parameter query_components: preliminary query components 
+
+        Parameter parenthesis_level: parenthesis level of current query/subquery
+        
+        Parameter curr_level: current level of query/subquery (where 0 represents highest level query)
+        
+        Parameter query_alias: alias for current query
+        """
         last_keyword_token = token.SQLToken()
         last_keyword_token.parenthesis_level = parenthesis_level
         last_comma_index = None
@@ -516,8 +647,8 @@ if __name__ == "__main__":
                     WHERE
                         l_partkey = ps_partkey
                         AND l_suppkey = ps_suppkey
-                        AND l_shipdate >= date 1-1-1994
-                        AND l_shipdate < date 1-1-1994 + '1 year'
+                        AND l_shipdate >= date '1-1-1994'
+                        AND l_shipdate < date '1-1-1994' + '1 year'
                 )
         )
         AND s_nationkey = n_nationkey
