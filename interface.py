@@ -37,7 +37,7 @@ modal = html.Div([
             size="lg",
             is_open=False,
         ),
-        dbc.Modal(
+        html.Div([dbc.Modal(
             [
                 dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
             ],
@@ -45,7 +45,7 @@ modal = html.Div([
             id="modal-loading",
             size="lg",
             is_open=False,
-        )
+        )], id="loadingdiv")
 ])
 
 heading = dbc.NavbarSimple(
@@ -245,6 +245,7 @@ def open_loading(n_clicks):
 
 @app.callback(
     Output('table1', 'children'),
+    # Output('loadingdiv', 'children'),
     Input('query_submit_button', 'n_clicks'),
     State("modal-loading", "is_open"),
     State('textarea-sql-query', 'value')
@@ -258,7 +259,7 @@ def update_output(n_clicks, open, value):
     #     }
     # }
     # set_output = {'query_1': {'subqueries': {}, 'select': 'select n_nationkey', 'from': 'from nation', 'intersect': 'intersect query_2'}, 'query_2': {'subqueries': {}, 'select': 'select s_nationkey', 'from': 'from supplier'}}
-    print(open)
+    
     if n_clicks:
         print("here")
         query_output = process_query(value)
