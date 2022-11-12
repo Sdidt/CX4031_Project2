@@ -305,7 +305,7 @@ body_top_left = html.Div(children=[
 
 
 
-body_left = html.Div(children=[body_top_left, visualization_div], style={'width': '100%'})
+body_left = html.Div(children=[body_top_left], style={'width': '100%'})
 
 popup = html.Div(dbc.Spinner(color="primary"), id="spinner")
 
