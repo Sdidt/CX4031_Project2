@@ -110,6 +110,7 @@ class Annotator:
         # print(curr_key_chain)
         # print(decomposed_query)
         v = relevant_info[key]
+        merge_join_order_by_explanation = ""
         for k in decomposed_query.keys():
             relevant_decomposed_query = decomposed_query[k]
             relevant_query_component = query_component_dict[k]
@@ -121,7 +122,7 @@ class Annotator:
                 if "subqueries" in relevant_decomposed_query:
                     # print("Recursive subquery call")
                     # print(curr_key_chain + ["subqueries"])
-                    subproblem_optimal_key_chain, subproblem_optimal_clause, subproblem_optimal_score = self.traverse_and_find_best_match(node, key, relevant_decomposed_query["subqueries"], relevant_query_component["subqueries"], relevant_component_mapping["subqueries"], curr_key_chain + ["subqueries"], i + 1)
+                    subproblem_optimal_key_chain, subproblem_optimal_clause, subproblem_optimal_score, merge_join_order_by_explanation = self.traverse_and_find_best_match(node, key, relevant_decomposed_query["subqueries"], relevant_query_component["subqueries"], relevant_component_mapping["subqueries"], curr_key_chain + ["subqueries"], i + 1)
                     # print("subproblem_optimal_key_chain: {}".format(subproblem_optimal_key_chain))
                     if subproblem_optimal_score > curr_optimal_score:
                         print("Replacing")
@@ -144,17 +145,24 @@ class Annotator:
                         curr_optimal_score = curr_score
                         optimal_clause = v
                         optimal_key_chain = curr_key_chain.copy()
+                        if node.type == "Merge Join":
+                            join_attributes = node.join_filters[0].split(" ")
+                            print("JOIN ATTIRBUTES: {}".format(join_attributes))
+                            for join_attribute in join_attributes:
+                                if "order by" in relevant_query_component:
+                                    if join_attribute in relevant_query_component["order by"]:
+                                        merge_join_order_by_explanation += ". Further, sorting by the join attribute {} is performed using clause {}".format(join_attribute, relevant_query_component["order by"])
                     print("Similarity Score: {}".format(curr_score))
                     curr_key_chain.pop()
                 if curr_optimal_score > 0.65:
                     print("Fairly good match is found: {}".format(optimal_clause))
                 print("\n######################################################################################################################\n")
             curr_key_chain.pop()
-        return optimal_key_chain, optimal_clause, curr_optimal_score
+        return optimal_key_chain, optimal_clause, curr_optimal_score, merge_join_order_by_explanation
 
     def find_match_in_decomposed_query(self, node: Node, i=0):
         for k, v in node.keywords.items():
-            optimal_key_chain, optimal_clause, similarity_score = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
+            optimal_key_chain, optimal_clause, similarity_score, merge_join_order_by_explanation = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
             print("Optimal key chain: {}".format(optimal_key_chain))
             print("Optimal clause: {}".format(optimal_clause))
             print("Similarity Score: {}".format(similarity_score))
@@ -186,7 +194,9 @@ class Annotator:
                 elif "join" in node.type.lower() or "nested loop" in node.type.lower():
                     print("FOUND JOIN NODE IN MATCH QUERY")
                     cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)   
-                    explanation += choice_explanation        
+                    explanation += choice_explanation 
+                    if node.type == "Merge Join":
+                        explanation += merge_join_order_by_explanation       
                 else:
                     explanation += "."
                 if original_query_component not in relevant_component_mapping:
@@ -200,7 +210,7 @@ class Annotator:
     
     def annotate_nodes(self):
         for node in self.QEP:
-            # node.print_debug_info()
+            node.print_debug_info()
             self.find_match_in_decomposed_query(node)
 
     def explain_costs(self, cost_dict, qep_node_type, qep_cost):
@@ -225,9 +235,9 @@ class Annotator:
         elif len(ratios) > 1:
             choice_explanation = " because it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
         if len(anomalous_ratios) == 1:
-            choice_explanation += " However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + "{:.2f}".format(list(anomalous_ratios.values())[0]) + " less operations than " + qep_node_type + "."
+            choice_explanation += " However, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + "{:.2f}".format(list(anomalous_ratios.values())[0]) + " less operations than " + qep_node_type + "."
         elif len(anomalous_ratios) > 1:
-            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + qep_node_type + "."
+            choice_explanation += " However, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + qep_node_type + "."
         return choice_explanation
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
@@ -253,7 +263,7 @@ class Annotator:
 
             for node in AQP:
                 # to find anotherrr forrm of scan
-                node.print_debug_info()
+                # node.print_debug_info()
                 aqp_node_type = node.type
                 if node.type == "Bitmap Index Scan":
                     is_bitmap_index_scan = True

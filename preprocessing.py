@@ -351,10 +351,14 @@ class PreProcessor:
                         # print("End of " + clause + " tokens")
                         curr_query, clause_list = self.extract_where_having(curr_query, curr_query_components, where_tokens, [], last_keyword_token, query_alias, curr_level)
                         curr_component.extend(clause_list)
-                        last_comma_index = i + 1                                                
+                        last_comma_index = i + 1   
+                        continue                                             
 
                     if (t.value.lower() == "union" or t.value.lower() == "intersect" or t.value.lower() == "minus"):
+                        print("reached set op")
                         i += 1
+                        for t in tokens[i:]:
+                            print(t.value.lower())
                         set_op = t.value.lower()
                         t = tokens[i]
                         self.curr_query_num[query_alias][curr_level] += 1

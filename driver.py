@@ -4,7 +4,11 @@ from annotation import Annotator
 
 def process_query(query):
     db = DB()
+    # try:
     preprocessor = PreProcessor(query, db)
+    # except Exception as e:
+    #     print("Error: {}".format(e))
+    #     return {}
 
     print("\n######################################################################################################################\n")
 
@@ -20,7 +24,11 @@ def process_query(query):
     print()
     print(preprocessor.decomposed_query)
     print(preprocessor.index_column_dict)
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
+    try:
+        annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
+    except Exception as e:
+        print(e)
+        return {}
 
     # print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
     annotator.annotate_nodes()
@@ -188,6 +196,9 @@ if __name__ == "__main__":
         """,
         """
         select * from part where p_brand = 'Brand#13' and p_size <> (select max(p_size) from part);
+        """
+        """
+        select n_nationkey from nation union select s_nationkey from supplier
         """
     ]
 

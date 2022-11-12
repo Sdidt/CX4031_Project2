@@ -51,7 +51,7 @@ class Node():
 
         if self.type == "Seq Scan":
             self.keywords = self.node_seq_scan()
-        elif self.type == "Index Scan":
+        elif self.type == "Index Scan" or self.type == "Index Only Scan":
             self.keywords = self.node_index_scan()
         elif self.type == "Bitmap Index Scan":
             self.keywords = self.node_bitmap_index_scan()
@@ -225,7 +225,7 @@ class Node():
             for keyword in keywords:
                 relevant_info[keyword] = condition
 
-            self.join_filters = condition
+            self.join_filters = [condition, self.revert_condition(condition)]
             print("Extraced merge condition: {}".format(self.join_filters))
         return relevant_info
 
