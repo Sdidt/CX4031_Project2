@@ -506,7 +506,7 @@ def update_output(n_clicks, open, value):
             return html.Div([]), html.Div([dbc.Modal(
             [
                 dbc.ModalHeader([dbc.ModalTitle("Error")]),
-                dbc.ModalBody("There is an error in the backend. Please try again."),
+                dbc.ModalBody("The database had an internal error, or the query was too complex and timed out. Kindly recheck your input SQL query!"),
             ],
             size="lg",
             is_open=True
