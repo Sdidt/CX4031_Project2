@@ -197,7 +197,16 @@ modal = html.Div([
             id="modal-startup",
             size="lg",
             is_open=True,
-        )
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Database Details")),
+                dbc.ModalBody("Database details successfully submitted"),
+            ],
+            id="modal-database",
+            size="lg",
+            is_open=False,
+        ),
 ])
 
 heading = dbc.NavbarSimple(
@@ -209,6 +218,22 @@ heading = dbc.NavbarSimple(
     brand_style={'color':'lightsteelblue', 'font-weight' : 'bold', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"},
     color="dark"
 )
+
+connection_details = html.Div(children=[
+    dbc.CardHeader(
+        children=[dbc.Label("DB Connection Details",style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"})]
+    ),
+    dbc.CardBody([html.Div([dbc.Label("Host:", style={'padding-right': 5}),dcc.Input(id="host-input", type="text", style={'width': '182px'}), 
+                dbc.Label("Database Name:", style={'padding-left':10, 'padding-right': 5}),dcc.Input(id="dbname-input", type="text", style={'width': '182px'}),
+                dbc.Label("Username:", style={'padding-left':10, 'padding-right': 5}),dcc.Input(id="username-input", type="text", style={'width': '182px'}),
+                dbc.Label("Password:", style={'padding-left':10, 'padding-right': 5}),dcc.Input(id="password-input", type="text", style={'width': '182px'}),
+                dbc.Label("Port:", style={'padding-left':10, 'padding-right': 5}),dcc.Input(id="port-input", type="text", style={'width': '182px'})], style={'display': 'flex', 'justify-content': 'center'}),
+                html.Br(),
+                dbc.Button("Submit", id='dbdetails_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+                    style={'margin-right': 5, 'float': 'right', 'font-size' : '17px'}),
+                html.Div(className="vl", style={'width':'max-width', 'border-top':'2px solid rgba(0,0,0,.25)', 'padding-right': 10, 'margin-top': 50})]),
+    
+])
 
 test_png = 'image/info.png'
 test_base64 = base64.b64encode(open(test_png, 'rb').read()).decode('ascii')
@@ -318,6 +343,7 @@ popup = html.Div(dbc.Spinner(color="primary"), id="spinner")
 app.layout = html.Div(children=[
                 modal,
                 heading,
+                connection_details,
                 body_left,
                 spinner_boolean,
                 error_boolean
@@ -436,6 +462,19 @@ app.callback(
 #     return "true"
 
 @app.callback(
+    Output('modal-database', 'is_open'),
+    Input('dbdetails_submit_button', 'n_clicks'),
+    State('host-input', 'value'),
+    State('dbname-input', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    State('port-input', 'value')
+)
+def get_database_inputs(n_clicks, host, dbname, username, password, port):
+    if n_clicks:
+        return True
+
+@app.callback(
     Output('modal-loading', 'is_open'),
     Input('query_submit_button', 'n_clicks'),
     Input('textarea-sql-query', 'value'),
@@ -489,7 +528,7 @@ def update_output(n_clicks, value):
     #     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
     #     }
     # }
-        if (query_output == ""):
+        if (query_output == {}):
             print("display error message")
             return html.Div([]), None, "false", True
         else:
