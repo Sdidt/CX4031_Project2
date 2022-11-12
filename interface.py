@@ -1,6 +1,8 @@
-from dash import Dash, html, dcc, Input, Output, State, dash_table, ctx
+from dash import Dash, html, dcc, Input, Output, State, dash_table, ctx, dash
 import dash_bootstrap_components as dbc
 import time, base64
+
+from pytermgui import background
 from driver import process_query
 # import plotly.express as px
 # import pandas as pd
@@ -179,6 +181,15 @@ modal = html.Div([
         )], id="loadingdiv"),
         dbc.Modal(
             [
+                dbc.ModalHeader([dbc.ModalTitle("Error")]),
+                dbc.ModalBody("The database had an internal error, or the query was too complex and timed out. Kindly recheck your input SQL query!"),
+            ],
+            size="lg",
+            is_open=False,
+            id="error-message"
+        ),
+        dbc.Modal(
+            [
                 dbc.ModalHeader([dbc.ModalTitle("Disclaimer")]),
                 dbc.ModalBody("Note that the QEP and AQP generation takes some time to finish. Please wait a few moments upon clicking the submit button. Thank you.")
             ],
@@ -199,7 +210,7 @@ heading = dbc.NavbarSimple(
     color="dark"
 )
 
-test_png = 'image\info.png'
+test_png = 'image/info.png'
 test_base64 = base64.b64encode(open(test_png, 'rb').read()).decode('ascii')
 
 sql_query_div = html.Div(children=[
@@ -318,6 +329,7 @@ body_top_left = html.Div(children=[
 body_left = html.Div(children=[body_top_left], style={'width': '100%'})
 
 spinner_boolean = html.Div(children="true", id="loading-boolean", style={'display': 'none'})
+error_boolean = html.Div(children="false", id="error-boolean", style={'display': 'none'})
 
 popup = html.Div(dbc.Spinner(color="primary"), id="spinner")
 
@@ -325,7 +337,8 @@ app.layout = html.Div(children=[
                 modal,
                 heading,
                 body_left,
-                spinner_boolean
+                spinner_boolean,
+                error_boolean
             ])
 
 def recursive_display(dict_output, div_components: list = [], title_padding=0, table_padding=1):
@@ -451,7 +464,8 @@ app.callback(
     State('loading-boolean', 'children')
 )
 def open_loading(n_clicks, value, loading):
-    # print(ctx.inputs)
+    print(ctx.inputs)
+    # print(error)
     # print(str(ctx.triggered_id))
     # print(n_clicks)
     # print(loading)
@@ -478,11 +492,14 @@ def open_loading(n_clicks, value, loading):
     Output('table1', 'children'),
     Output('loadingdiv', 'children'),
     Output('loading-boolean', 'children'),
+    Output('error-message', 'is_open'),
     Input('query_submit_button', 'n_clicks'),
-    State("modal-loading", "is_open"),
     State('textarea-sql-query', 'value')
 )
-def update_output(n_clicks, open, value):
+def update_output(n_clicks, value):
+    # print(open)
+    # open_loading(n_clicks, value, "", "")
+    # print(value)
     # print(n_clicks)
     # print("QUERY OUTPUT: {}".format(query_output))
     # html_output = []
@@ -501,25 +518,21 @@ def update_output(n_clicks, open, value):
     #     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
     #     }
     # }
-        if (query_output == {}):
+        if (query_output == ""):
             print("display error message")
-            return html.Div([]), html.Div([dbc.Modal(
-            [
-                dbc.ModalHeader([dbc.ModalTitle("Error")]),
-                dbc.ModalBody("The database had an internal error, or the query was too complex and timed out. Kindly recheck your input SQL query!"),
-            ],
-            size="lg",
-            is_open=True
-        )]), "false"
+            return html.Div([]), None, "false", True
         else:
+            
             div_components = []
             lst_curr_object, div_components = recursive_display(query_output, [])
-            # print("FINAL RESULT: {}".format(div_components))
+            
             html_output = div_components
+            
+            # print("FINAL RESULT: {}".format(div_components))
             # print("HTML OUTPUT: {}".format(html_output))
             print("done executing")
             # print(html_output)
-            return html.Div(html_output), [dbc.Modal(
+            return html.Div(query_output), [dbc.Modal(
                 [
                     dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
                 ],
@@ -527,7 +540,7 @@ def update_output(n_clicks, open, value):
                 id="modal-loading",
                 size="lg",
                 is_open=False,
-            )], "false"
+            )], "false", False
 
 if __name__ == '__main__':
     app.run_server(debug=True)
