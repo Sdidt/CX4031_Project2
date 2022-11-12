@@ -1,7 +1,7 @@
 from connection import DB
 from preprocessing import PreProcessor
 from annotation import Annotator
-
+import json
 def process_query(query):
     db = DB()
     try:
@@ -23,7 +23,9 @@ def process_query(query):
     print("Decomposed Query:")
     print()
     print(preprocessor.decomposed_query)
-    print(preprocessor.index_column_dict)
+
+    print("----------------Index Column Dictionary----------------------")
+    print(json.dumps(preprocessor.index_column_dict, indent=2, sort_keys=True))
     try:
         annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
         
