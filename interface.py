@@ -1,6 +1,6 @@
 from dash import Dash, html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
-import time
+import time, base64
 from driver import process_query
 # import plotly.express as px
 # import pandas as pd
@@ -9,16 +9,146 @@ from driver import process_query
 # dict_ = {'key 1': 'value 1', 'key 2': 'value 2', 'key 3': 'value 3'}
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP]) 
 
-modal = html.Div([
-        dbc.Modal(
-            [
-                dbc.ModalHeader(dbc.ModalTitle("Visual Plan - Detailed View")),
-                dbc.ModalBody("This is for visual plan."),
-            ],
-            id="modal-visual",
-            size="lg",
+list_group = dbc.ListGroup(
+    [
+        dbc.ListGroupItem("Customer", id="custAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. c_custkey integer"),
+                    dbc.ListGroupItem("2. c_name character varying"),
+                    dbc.ListGroupItem("3. c_address character varying"),
+                    dbc.ListGroupItem("4. c_nationkey integer"),
+                    dbc.ListGroupItem("5. c_phone character"),
+                    dbc.ListGroupItem("6. c_acctbal numeric"),
+                    dbc.ListGroupItem("7. c_mktsegment character"),
+                    dbc.ListGroupItem("8. c_comment character varying")
+                ])
+                )),
+            id="collapse1",
             is_open=False,
         ),
+        dbc.ListGroupItem("Supplier", id="suppAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. s_suppkey integer"),
+                    dbc.ListGroupItem("2. s_name character"),
+                    dbc.ListGroupItem("3. s_address character varying"),
+                    dbc.ListGroupItem("4. s_nationkey integer"),
+                    dbc.ListGroupItem("5. s_phone character"),
+                    dbc.ListGroupItem("6. s_acctbal numeric"),
+                    dbc.ListGroupItem("7. s_comment character varying")
+                ])
+                )),
+            id="collapse2",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("Nation", id="nationAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. n_nationkey integer"),
+                    dbc.ListGroupItem("2. n_name character"),
+                    dbc.ListGroupItem("3. n_regionkey integer"),
+                    dbc.ListGroupItem("4. n_comment character varying")
+                ])
+                )),
+            id="collapse3",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("Region", id="regionAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. r_regionkey integer"),
+                    dbc.ListGroupItem("2. r_name character"),
+                    dbc.ListGroupItem("3. r_comment character varying")
+                ])
+                )),
+            id="collapse4",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("Part", id="partAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. p_partkey integer"),
+                    dbc.ListGroupItem("2. p_name character varying"),
+                    dbc.ListGroupItem("3. p_mfgr character"),
+                    dbc.ListGroupItem("4. p_brand character"),
+                    dbc.ListGroupItem("5. p_type character varying"),
+                    dbc.ListGroupItem("6. p_size integer"),
+                    dbc.ListGroupItem("7. p_container character"),
+                    dbc.ListGroupItem("7. p_retailprice numeric"),
+                    dbc.ListGroupItem("8. c_comment character varying")
+                ])
+                )),
+            id="collapse5",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("Partsupp", id="partsuppAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. ps_partkey integer"),
+                    dbc.ListGroupItem("2. ps_suppkey integer"),
+                    dbc.ListGroupItem("3. ps_availqty integer"),
+                    dbc.ListGroupItem("4. ps_supplycost numeric"),
+                    dbc.ListGroupItem("5. ps_comment character varying")
+                ])
+                )),
+            id="collapse6",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("Orders", id="orderAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. o_orderkey integer"),
+                    dbc.ListGroupItem("2. o_custkey integer"),
+                    dbc.ListGroupItem("3. o_orderstatus character"),
+                    dbc.ListGroupItem("4. o_totalprice numeric"),
+                    dbc.ListGroupItem("5. o_orderdate date"),
+                    dbc.ListGroupItem("6. o_orderpriority character"),
+                    dbc.ListGroupItem("7. o_clerk character"),
+                    dbc.ListGroupItem("8. o_shippriority integer"),
+                    dbc.ListGroupItem("9. c_comment character varying")
+                ])
+                )),
+            id="collapse7",
+            is_open=False,
+        ),
+        dbc.ListGroupItem("LineItem", id="lineitemAttr", href="#", n_clicks=0),
+        dbc.Collapse(
+            dbc.Card(dbc.CardBody(
+                dbc.ListGroup([
+                    dbc.ListGroupItem("1. l_orderkey integer"),
+                    dbc.ListGroupItem("2. l_partkey integer"),
+                    dbc.ListGroupItem("3. l_suppkey integer"),
+                    dbc.ListGroupItem("4. l_linenumber integer"),
+                    dbc.ListGroupItem("5. l_quantity numeric"),
+                    dbc.ListGroupItem("6. l_extendedprice numeric"),
+                    dbc.ListGroupItem("7. l_discount numeric"),
+                    dbc.ListGroupItem("8. l_tax numeric"),
+                    dbc.ListGroupItem("9. l_returnflag character"),
+                    dbc.ListGroupItem("10. l_linestatus character"),
+                    dbc.ListGroupItem("11. l_shipdate date"),
+                    dbc.ListGroupItem("12. l_commitdate date"),
+                    dbc.ListGroupItem("13. l_receipdate date"),
+                    dbc.ListGroupItem("14. l_shipinstruct character"),
+                    dbc.ListGroupItem("15. l_shipmode character"),
+                    dbc.ListGroupItem("16. l_comment character varying")
+                ])
+                )),
+            id="collapse8",
+            is_open=False,
+        ),
+    ],
+    flush=True,
+)
+
+modal = html.Div([
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("About")),
@@ -32,6 +162,7 @@ modal = html.Div([
             [
                 dbc.ModalHeader(dbc.ModalTitle("Datasets")),
                 dbc.ModalBody("In this project, datasets name TPC-H are loaded into PostgreSQL RDBMS."),
+                list_group
             ],
             id="modal-datasets",
             size="lg",
@@ -63,27 +194,71 @@ heading = dbc.NavbarSimple(
         dbc.NavItem(dbc.NavLink("About", href="#", id="aboutLink", style={'color':'lightsteelblue', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "17px"})),
         dbc.NavItem(dbc.NavLink("Datasets", href="#", id="datasetsLink", style={'color':'lightsteelblue', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "17px"})),
     ],
-    brand="Project 2",
+    brand="PROJECT 2",
     brand_style={'color':'lightsteelblue', 'font-weight' : 'bold', "font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"},
     color="dark"
 )
 
+test_png = 'image\info.png'
+test_base64 = base64.b64encode(open(test_png, 'rb').read()).decode('ascii')
+
 sql_query_div = html.Div(children=[
-                            dbc.Label("SQL Query",
-                            style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
-                            dcc.Textarea(
-                                id='textarea-sql-query',
-                                placeholder='Enter your SQL query here.',
-                                value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
-                                style={'width': '100%', 'height': 230, 'resize': 'none','font-size' :"18px"},
-                            ),
-                            html.Br(),
-                            dbc.Button('Submit', id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right', 'font-size' : '17px'}
-                                        ),
-                        ], 
-                            style={'width': '35%', 'height': 250},
-                )
+    dbc.CardHeader(
+        children=[dbc.Label("SQL Query", style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
+            html.Img(src='data:image/png;base64, {}'.format(test_base64), id="sqlImage", style={'height' : 20, 'padding-left' : 5})]
+    ),
+    dbc.CardBody([
+        dbc.Popover(
+            "Example : SELECT * FROM nation ",
+            target="sqlImage",
+            body=True,
+            trigger="hover",
+        ),
+        dcc.Textarea(
+            id='textarea-sql-query',
+            placeholder='Enter your SQL query here.',
+            value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
+            style={'width': '100%', 'height': 280, 'resize': 'none','font-size' :"18px"},
+        ),
+        html.Br(),
+        dbc.Button("Submit", id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+            style={'float': 'right', 'font-size' : '17px'}),
+    ]),
+])
+
+sql_cards = html.Div([
+    dbc.Row(
+        [
+            dbc.Col(dbc.Card(sql_query_div, color="light")),
+        ],
+        className="mb-4",
+    )],
+    style={"width": "30rem", "height" : '50rem'}
+)
+
+# sql_query_div = html.Div(children=[
+#                             dbc.Label("SQL Query",
+#                             style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
+#                             html.Img(src='data:image/png;base64, {}'.format(test_base64), id="sqlImage", style={'height' : 20, 'padding-left' : 5}),
+#                             dbc.Popover(
+#                                 "Example : SELECT * FROM nation ",
+#                                 target="sqlImage",
+#                                 body=True,
+#                                 trigger="hover",
+#                             ),
+#                             dcc.Textarea(
+#                                 id='textarea-sql-query',
+#                                 placeholder='Enter your SQL query here.',
+#                                 value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
+#                                 style={'width': '100%', 'height': 230, 'resize': 'none','font-size' :"18px"},
+#                             ),
+#                             html.Br(),
+#                             dbc.Button('Submit', id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+#                                         style={'float': 'right', 'font-size' : '17px'}
+#                                         ),
+#                         ], 
+#                             style={'width': '35%', 'height': 250, "padding-left" : 10},
+#                 )
 
 natural_language_div = html.Div(children=[
                             dbc.Label("Natural Language Description"),
@@ -107,21 +282,22 @@ natural_language_div = html.Div(children=[
                             style={'width': '65%', 'height': 250, 'padding-left': 20},
                         )
 
-visualization_div = html.Div([
-                        dbc.Label("Visualize Plan",
-                        style={"font-size" : "20px"}),
-                        dcc.Textarea(
-                                id='graph-nl-steps',
-                                placeholder='show flowchart here',
-                                style={'width': '100%', 'height': 230, 'resize': 'none', "font-size" : "18px"},
-                                readOnly=True
-                            ),
-                        html.Br(),
-                        dbc.Button('Detailed View', outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right', 'margin-bottom': 10, "font-size" : "17px"}, id="visualButton"),
-                    ],
-                        style={'padding-top': 50, 'width': '35%', 'padding-left': 10, "font-family" : "Mach OT W03 Condensed Medium"}
-                    )
+# visualization_div = html.Div([
+#                         dbc.Label("Visualize Plan",
+#                         style={"font-size" : "20px"}),
+#                         dcc.Textarea(
+#                                 id='graph-nl-steps',
+#                                 placeholder='show flowchart here',
+#                                 style={'width': '100%', 'height': 230, 'resize': 'none', "font-size" : "18px"},
+#                                 readOnly=True
+#                             ),
+#                         html.Br(),
+#                         dbc.Button('Detailed View', outline= True, color='primary', className='me-1', size='sm',
+#                                         style={'float': 'right', 'margin-bottom': 10, "font-size" : "17px"}, id="visualButton"),
+#                     ],
+#                         style={'padding-top': 50, 'width': '35%', 'padding-left': 10, "font-family" : "Mach OT W03 Condensed Medium"}
+#                     )
+
 body_right = html.Div([
             dbc.Label("Natural Language Description", style={"font-size" : "20px"}),
             html.Div(children=[], id="table1", style={'width': '100%', "font-size" : "18px"})
@@ -130,7 +306,7 @@ body_right = html.Div([
 )
 
 body_top_left = html.Div(children=[
-                    sql_query_div,
+                    sql_cards,
                     body_right
                 ],
                 style={'width': '100%', 'display': 'flex','padding-top':30, 'padding-left': 10, 'padding-right': 10, 
@@ -139,7 +315,7 @@ body_top_left = html.Div(children=[
 
 
 
-body_left = html.Div(children=[body_top_left, visualization_div], style={'width': '100%'})
+body_left = html.Div(children=[body_top_left], style={'width': '100%'})
 
 spinner_boolean = html.Div(children="true", id="loading-boolean", style={'display': 'none'})
 
@@ -198,15 +374,15 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
         div_component = dash_table.DataTable(data=dict_array, 
                     style_table={
                         'padding-left': table_padding,
+                        'padding-top': 10,
                         'padding-bottom': 10,
                         'width': 'auto',
                         'max-height': '580px', 
                         'overflowY': 'auto'
                     },
-                    style_data={
-                    'whiteSpace': 'pre-line',
-                    'height': 'auto',
-                    },
+                    style_data={'whiteSpace': 'pre-line','height': 'auto'},
+                    style_header={"font-weight" : "bold"},
+                    style_as_list_view=True,
                     style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"})
         div_components.append(div_component) 
     # print(div_components)
@@ -218,21 +394,47 @@ def toggle_modal(n1, is_open):
     return is_open
 
 app.callback(
-    Output("modal-about", "is_open"),
-    Input("aboutLink", "n_clicks"),
-    State("modal-about", "is_open"),
+    Output("collapse1", "is_open"), Input("custAttr", "n_clicks"), State("collapse1", "is_open"),
 )(toggle_modal)
 
 app.callback(
-    Output("modal-datasets", "is_open"),
-    Input("datasetsLink", "n_clicks"),
-    State("modal-datasets", "is_open"),
+    Output("collapse2", "is_open"), Input("suppAttr", "n_clicks"), State("collapse2", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse3", "is_open"), Input("nationAttr", "n_clicks"), State("collapse3", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse4", "is_open"), Input("regionAttr", "n_clicks"), State("collapse4", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse5", "is_open"), Input("partAttr", "n_clicks"), State("collapse5", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse6", "is_open"), Input("partsuppAttr", "n_clicks"), State("collapse6", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse7", "is_open"), Input("orderAttr", "n_clicks"), State("collapse7", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("collapse8", "is_open"), Input("lineitemAttr", "n_clicks"), State("collapse8", "is_open")
+)(toggle_modal)
+
+app.callback(
+    Output("modal-about", "is_open"), Input("aboutLink", "n_clicks"), State("modal-about", "is_open"),
+)(toggle_modal)
+
+app.callback(
+    Output("modal-datasets", "is_open"), Input("datasetsLink", "n_clicks"), State("modal-datasets", "is_open"),
 )(toggle_modal) 
 
 app.callback(
-    Output("modal-visual", "is_open"),
-    Input("visualButton", "n_clicks"),
-    State("modal-visual", "is_open"),
+    Output("modal-visual", "is_open"), Input("visualButton", "n_clicks"), State("modal-visual", "is_open"),
 )(toggle_modal) 
 
 # @app.callback(

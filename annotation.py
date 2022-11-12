@@ -209,8 +209,8 @@ class Annotator:
                             print("JOIN ATTIRBUTES: {}".format(join_attributes))
                             for join_attribute in join_attributes:
                                 if "order by" in relevant_query_component:
-                                    if join_attribute in relevant_query_component["order by"]:
-                                        merge_join_order_by_explanation += ". Further, sorting by the join attribute {} is performed using clause {}".format(join_attribute, relevant_query_component["order by"])
+                                    if join_attribute in relevant_query_component["order by"].lower():
+                                        merge_join_order_by_explanation += "Further, sorting by the join attribute {} is performed using clause {}.".format(join_attribute, relevant_query_component["order by"])
                     print("Similarity Score: {}".format(curr_score))
                     curr_key_chain.pop()
                 if curr_optimal_score > 0.65:

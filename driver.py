@@ -26,6 +26,7 @@ def process_query(query):
     print(preprocessor.index_column_dict)
     try:
         annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
+        
     except Exception as e:
         print(e)
         return {}
