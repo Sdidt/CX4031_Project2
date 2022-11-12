@@ -1,10 +1,21 @@
 from node import Node
 
 def aggregate_define(node : Node, condition,index_column_dict):
-    # For plans of the aggregate type: SortAggregate, HashAggregate, PlainAggregate
+    """ 
+    
+    Returns the natural langauge description of the following Node types: SortAggregate, HashAggregate and PlainAggregate
+    
+    Paramemter node: the Node object.
+
+    Paramemter condition: The specific SQL Query clause.
+
+    Parameter index_column_dict: The dictionary that contains the index names and their respecitve tables and table columns.  
+   
+    """
+
     strategy = node.information["Strategy"]
     if strategy == "Sorted":
-        result = "The clauses " + condition+ " rows are sorted based on their keys."
+        result = "The clause " + condition+ " rows are sorted based on their keys(s)."
         if "Group Key" in node.information:
             result += " They are aggregated by the following keys: "
             for key in node.information["Group Key"]:
@@ -13,19 +24,17 @@ def aggregate_define(node : Node, condition,index_column_dict):
             result += "."
         if "Filter" in node.information:
             result += " They are filtered by " + node.information["Filter"].replace("::text", "")
-            
             result += "."
         return result
     elif strategy == "Hashed":
-        result = "The clauses " + condition+ " hashes all rows based on the following key(s): "
+        result = "The clause " + condition+ " hashes all rows based on the following key(s): "
         for key in node.information["Group Key"]:
             result += key.replace("::text", "") + ", "
-        result += "which are then aggregated into bucket given by the hashed key."
+        result += "which are then aggregated into individual bucket based on a key."
         return result
     elif strategy == "Plain":
-        return "Result is simply aggregated as normal."
+        result = "The Clause " + condition+ " simply aggregated as normal"
+        return result
     else:
-        raise ValueError(
-            "Aggregate_explain does not work for strategy: " + strategy
-        )
+        return "The clause " + condition + " performed aggregation."
 

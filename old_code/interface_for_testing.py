@@ -8,7 +8,6 @@ import base64, time, re
 dict_ = {'key 1': 'value 1', 'key 2': 'value 2', 'key 3': 'value 3'}
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-
 list_group = dbc.ListGroup(
     [
         dbc.ListGroupItem("Customer", id="custAttr", href="#", n_clicks=0),
@@ -222,7 +221,7 @@ sql_query_div = html.Div(children=[
         dcc.Textarea(
             id='textarea-sql-query',
             placeholder='Enter your SQL query here.',
-            value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
+            #value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
             style={'width': '100%', 'height': 280, 'resize': 'none','font-size' :"18px"},
         ),
         html.Br(),
@@ -231,10 +230,26 @@ sql_query_div = html.Div(children=[
     ]),
 ])
 
+sql_query_example = dbc.ListGroup(
+    [
+        dbc.ListGroupItem("Item 1", href="#"),
+        dbc.ListGroupItem("Item 2", href="/l/components/list_group"),
+        dbc.ListGroupItem("Item 3"),
+        dbc.ListGroupItem("Item 4"),
+    ],
+    flush=True,
+)
+
 cards = html.Div([
     dbc.Row(
         [
             dbc.Col(dbc.Card(sql_query_div, color="light")),
+        ],
+        className="mb-4",
+    ),
+    dbc.Row(
+        [
+            dbc.Col(dbc.Card(sql_query_example, color="light")),
         ],
         className="mb-4",
     )],
@@ -333,12 +348,6 @@ app.callback(
     Output("modal-datasets", "is_open"),
     Input("datasetsLink", "n_clicks"),
     State("modal-datasets", "is_open"),
-)(toggle_modal) 
-
-app.callback(
-    Output("modal-visual", "is_open"),
-    Input("visualButton", "n_clicks"),
-    State("modal-visual", "is_open"),
 )(toggle_modal) 
 
 def recursive_display(dict_output, div_components : list = [], title_padding=0, table_padding=1):
