@@ -1,4 +1,4 @@
-from dash import Dash, html, dcc, Input, Output, State, dash_table
+from dash import Dash, html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 import time
 from driver import process_query
@@ -45,7 +45,17 @@ modal = html.Div([
             id="modal-loading",
             size="lg",
             is_open=False,
-        )], id="loadingdiv")
+        )], id="loadingdiv"),
+        dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Disclaimer")]),
+                dbc.ModalBody("Note that the QEP and AQP generation takes some time to finish. Please wait a few moments upon clicking the submit button. Thank you.")
+            ],
+            backdrop="static",
+            id="modal-startup",
+            size="lg",
+            is_open=True,
+        )
 ])
 
 heading = dbc.NavbarSimple(
@@ -131,12 +141,15 @@ body_top_left = html.Div(children=[
 
 body_left = html.Div(children=[body_top_left, visualization_div], style={'width': '100%'})
 
+spinner_boolean = html.Div(children="true", id="loading-boolean", style={'display': 'none'})
+
 popup = html.Div(dbc.Spinner(color="primary"), id="spinner")
 
 app.layout = html.Div(children=[
                 modal,
                 heading,
-                body_left
+                body_left,
+                spinner_boolean
             ])
 
 def recursive_display(dict_output, div_components: list = [], title_padding=0, table_padding=1):
@@ -222,13 +235,29 @@ app.callback(
     State("modal-visual", "is_open"),
 )(toggle_modal) 
 
+# @app.callback(
+#     Output('loading-boolean', 'children'),
+#     Input('textarea-sql-query', 'value'),
+# )
+# def change_boolean(value):
+#     return "true"
 
 @app.callback(
     Output('modal-loading', 'is_open'),
     Input('query_submit_button', 'n_clicks'),
+    Input('textarea-sql-query', 'value'),
+    State('loading-boolean', 'children')
 )
-def open_loading(n_clicks):
-    if n_clicks>0 and False:
+def open_loading(n_clicks, value, loading):
+    # print(ctx.inputs)
+    # print(str(ctx.triggered_id))
+    # print(n_clicks)
+    # print(loading)
+    # print(value)
+    if n_clicks==1 and loading=="true":
+        return True
+    if n_clicks>1 and ctx.triggered_id=="query_submit_button":
+        print('came here')
         return True
 
 # @app.callback(
@@ -245,12 +274,14 @@ def open_loading(n_clicks):
 
 @app.callback(
     Output('table1', 'children'),
-    # Output('loadingdiv', 'children'),
+    Output('loadingdiv', 'children'),
+    Output('loading-boolean', 'children'),
     Input('query_submit_button', 'n_clicks'),
     State("modal-loading", "is_open"),
     State('textarea-sql-query', 'value')
 )
 def update_output(n_clicks, open, value):
+    # print(n_clicks)
     # print("QUERY OUTPUT: {}".format(query_output))
     # html_output = []
     # dict_output = {'query_1': {'subqueries': 
@@ -261,16 +292,24 @@ def update_output(n_clicks, open, value):
     # set_output = {'query_1': {'subqueries': {}, 'select': 'select n_nationkey', 'from': 'from nation', 'intersect': 'intersect query_2'}, 'query_2': {'subqueries': {}, 'select': 'select s_nationkey', 'from': 'from supplier'}}
     
     if n_clicks:
-        print("here")
         query_output = process_query(value)
-        if (query_output == {}):
-            print("display error message")
-            return 
+        # query_output = {}
     #     query_output = {'query_1': {'subqueries': 
     #     {'subquery_1': {'subqueries': {}, 'from partsupp P1 , supplier S , nation': ['The clause "from p1" is implemented using Seq Scan because no other option is available.', 'The clause "from s" is implemented using Seq Scan because it requires 44.62, 10351967.39 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "from nation_1" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'": ['The clause "where nation_1.n_name = \'GERMANY\'" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where s.s_nationkey = nation_1.n_nationkey" is implemented using Hash Join.', 'The clause "where p1.ps_suppkey = s.s_suppkey" is implemented using Hash Join.']}}
     #     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
     #     }
     # }
+        if (query_output == {}):
+            print("display error message")
+            return html.Div([]), html.Div([dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Error")]),
+                dbc.ModalBody("There is an error in the backend. Please try again."),
+            ],
+            size="lg",
+            is_open=True
+        )])
+        
         div_components = []
         lst_curr_object, div_components = recursive_display(query_output, [])
         # print("FINAL RESULT: {}".format(div_components))
@@ -278,7 +317,15 @@ def update_output(n_clicks, open, value):
         # print("HTML OUTPUT: {}".format(html_output))
         print("done executing")
         # print(html_output)
-        return html.Div(html_output)
+        return html.Div(html_output), [dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
+            ],
+            backdrop="static",
+            id="modal-loading",
+            size="lg",
+            is_open=False,
+        )], "false"
 
 if __name__ == '__main__':
     app.run_server(debug=True)
