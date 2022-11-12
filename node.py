@@ -1,8 +1,17 @@
 from __future__ import annotations
-
 class Node():
+    """
+    A class representing a operation in the query plan in the form of a node where information related to the operation and parent and children nodes can be keep tracked of.
+    """
 
     def __init__(self, data: dict, subquery_level) -> None:
+        """
+        This initializes each node type
+
+        Parameter data: a dictionary that consists of the metadata related to the operation
+
+        Parameter subquery_level: subquery level that shows the level at which the operation is conducted in the query
+        """
 
         self.type = data.get("Node Type")
         self.subquery_level = subquery_level
@@ -24,13 +33,31 @@ class Node():
         if (self.type == "Sort"):
             self.type = self.information["Sort Method"] + " Sort"
 
+
     def add_child(self, child: Node) -> None:
+        """
+        Adds child node into child list of the current node
+
+        Parameter child: a child node that is the child of current node
+        """
         self.children.append(child)
 
+
     def add_parent(self, parent: Node) -> None:
+        """
+        Adds parent node into parent list of the current node
+
+        Parameter parent: a parent node that is the parent of current node
+        """
+
         self.parent.append(parent)
 
+
     def get_estimated_cost(self):
+        """
+        Calculates the estimated cost of the operation in the current node and returns the cost in integer
+        
+        """
         # startup_cost = self.information["Startup Cost"]
         qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
         if self.type in ["Merge Join", "Nested Loop", "Index Nested Loop", "Bitmap Heap Scan"]:
@@ -45,8 +72,11 @@ class Node():
             return qep_cost
         return diff
 
-    def mapping(self):
 
+    def mapping(self):
+        """
+        Returns a list of dictionary that provides mapping to query based on the node type
+        """
         self.keywords = {}
 
         if self.type == "Seq Scan":
@@ -84,10 +114,21 @@ class Node():
             lst.append(dct)
         return lst
 
+
     def revert_condition(self, condition: str):
+        """
+        Manipulates the string to a form which fits another use case
+
+        Parameter condition: string 
+        """
         return " ".join(condition.split(" ")[::-1])
 
     def remove_punctuations(self, condition):
+        """
+        Removes the punctations in the string
+
+        Parameter condition: string
+        """
         split_condition = condition.split("::", 1)
         if len(split_condition) == 1:
             split_condition = split_condition[0][1:-1]
@@ -96,6 +137,9 @@ class Node():
         return split_condition
 
     def node_aggregate(self):
+        """
+        Returns a dictionary relevant to an aggregate node that helps with mapping to query 
+        """
         relevant_info = {}
         if 'Group Key' in self.information:
             group = self.information["Group Key"]
@@ -104,6 +148,9 @@ class Node():
 
     # complete: BUT need to handle case when sort is used before sort merge join
     def node_sort(self):
+        """
+        Returns a dictionary relevant to a sort node that helps with mapping to query 
+        """
         relevant_info = {}
         order = "desc" if self.information["Sort Key"][0][-4:] == "desc" else "asc"
         key = self.information["Sort Key"][0] if order == "asc" else self.information["Sort Key"][0][:-5]
@@ -114,6 +161,9 @@ class Node():
     
     # complete
     def node_seq_scan(self):
+        """
+        Returns a dictionary relevant to a seq scan node that helps with mapping to query 
+        """
         relevant_info = {}
         relation = self.information.get("Alias")
         relevant_info["from"] = relation
@@ -135,6 +185,9 @@ class Node():
 
     # complete
     def node_index_scan(self):
+        """
+        Returns a dictionary relevant to an index scan node that helps with mapping to query 
+        """
         relevant_info = {}
         relation = self.information.get("Alias")
         relevant_info["from"] = relation
@@ -156,6 +209,9 @@ class Node():
         return relevant_info
 
     def node_bitmap_index_scan(self):
+        """
+        Returns a dictionary relevant to a bitmap index scan node that helps with mapping to query 
+        """
         relevant_info = {}
     
         if "Index Cond" in self.information:
@@ -175,6 +231,9 @@ class Node():
         return relevant_info
 
     def node_bitmap_heap_scan(self):
+        """
+        Returns a dictionary relevant to a bitmap heap scan node that helps with mapping to query 
+        """
         relevant_info = {}
         relation = self.information.get("Alias")
         relevant_info["from"] = relation
@@ -184,6 +243,9 @@ class Node():
 
     # complete
     def node_hash(self):
+        """
+        Returns a dictionary relevant to a hash node that helps with mapping to query 
+        """
         relevant_info = {}
         return relevant_info
 
@@ -200,6 +262,9 @@ class Node():
         return relevant_info
     
     def node_nested_loop(self):
+        """
+        Returns a dictionary relevant to a nested loop node that helps with mapping to query 
+        """
         relevant_info = {}
         # print(self.information)
         if 'Join Filter' in self.information:
@@ -217,6 +282,9 @@ class Node():
         return relevant_info
 
     def node_merge_join(self):
+        """
+        Returns a dictionary relevant to a merge join node that helps with mapping to query 
+        """
         relevant_info = {}
         # print(self.information)
         if 'Merge Cond' in self.information:
@@ -229,8 +297,12 @@ class Node():
             print("Extraced merge condition: {}".format(self.join_filters))
         return relevant_info
 
-
     def trace_for_join(self):
+        """
+        Returns the filter condition and the index name from the descendant node of a nested loop node when the node itself does not have a filter
+
+        This is to deal with the special case when indexing is performed on the one of the relation etc .
+        """
         print("BEGIN TRACE")
         filter = ""
         # queue:list[Node] = self.create_queue_for_des()
@@ -249,6 +321,9 @@ class Node():
         return filter, None
 
     def print_debug_info(self):
+        """
+        This is for debugging purposes.
+        """
         print("NODE TYPE: {}".format(self.type))
         print("ESTIMATED COST: {}".format(self.get_estimated_cost()))
         # print("MAPPING: {}".format(self.mapping()))
