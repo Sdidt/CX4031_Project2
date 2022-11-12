@@ -282,22 +282,6 @@ natural_language_div = html.Div(children=[
                             style={'width': '65%', 'height': 250, 'padding-left': 20},
                         )
 
-# visualization_div = html.Div([
-#                         dbc.Label("Visualize Plan",
-#                         style={"font-size" : "20px"}),
-#                         dcc.Textarea(
-#                                 id='graph-nl-steps',
-#                                 placeholder='show flowchart here',
-#                                 style={'width': '100%', 'height': 230, 'resize': 'none', "font-size" : "18px"},
-#                                 readOnly=True
-#                             ),
-#                         html.Br(),
-#                         dbc.Button('Detailed View', outline= True, color='primary', className='me-1', size='sm',
-#                                         style={'float': 'right', 'margin-bottom': 10, "font-size" : "17px"}, id="visualButton"),
-#                     ],
-#                         style={'padding-top': 50, 'width': '35%', 'padding-left': 10, "font-family" : "Mach OT W03 Condensed Medium"}
-#                     )
-
 body_right = html.Div([
             dbc.Label("Natural Language Description", style={"font-size" : "20px"}),
             html.Div(children=[], id="table1", style={'width': '100%', "font-size" : "18px"})
@@ -312,8 +296,6 @@ body_top_left = html.Div(children=[
                 style={'width': '100%', 'display': 'flex','padding-top':30, 'padding-left': 10, 'padding-right': 10, 
                 "font-family" : "Mach OT W03 Condensed Medium"}
                 )
-
-
 
 body_left = html.Div(children=[body_top_left], style={'width': '100%'})
 
@@ -431,11 +413,7 @@ app.callback(
 
 app.callback(
     Output("modal-datasets", "is_open"), Input("datasetsLink", "n_clicks"), State("modal-datasets", "is_open"),
-)(toggle_modal) 
-
-app.callback(
-    Output("modal-visual", "is_open"), Input("visualButton", "n_clicks"), State("modal-visual", "is_open"),
-)(toggle_modal) 
+)(toggle_modal)
 
 # @app.callback(
 #     Output('loading-boolean', 'children'),
@@ -462,17 +440,10 @@ def open_loading(n_clicks, value, loading):
         print('came here')
         return True
 
-# @app.callback(
-#     Output("modal-visual", "is_open"),
-#     Input("visualButton", "n_clicks"),
-#     State("modal-visual", "is_open"),
-# )
-
 # def load_output(n):
 #     if n:
 #         time.sleep(5)
 #         return {'display':'none'}
-
 
 @app.callback(
     Output('table1', 'children'),
