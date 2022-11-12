@@ -8,6 +8,7 @@ import base64, time, re
 dict_ = {'key 1': 'value 1', 'key 2': 'value 2', 'key 3': 'value 3'}
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+
 list_group = dbc.ListGroup(
     [
         dbc.ListGroupItem("Customer", id="custAttr", href="#", n_clicks=0),
@@ -143,20 +144,11 @@ list_group = dbc.ListGroup(
             id="collapse8",
             is_open=False,
         ),
-    ],
+    ], 
     flush=True,
 )
 
 modal = html.Div([
-        dbc.Modal(
-            [
-                dbc.ModalHeader(dbc.ModalTitle("Visual Plan - Detailed View")),
-                dbc.ModalBody("This is for visual plan."),
-            ],
-            id="modal-visual",
-            size="lg",
-            is_open=False,
-        ),
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("About")),
@@ -191,35 +183,63 @@ heading = dbc.NavbarSimple(
 test_png = 'image\info.png'
 test_base64 = base64.b64encode(open(test_png, 'rb').read()).decode('ascii')
 
-sql_query_div = html.Div(children=[
-                            dbc.Label("SQL Query",
-                            style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
-                            html.Img(src='data:image/png;base64, {}'.format(test_base64), id="sqlImage", style={'height' : 20, 'padding-left' : 5}),
-                            dbc.Popover(
-                                "Example : SELECT * FROM nation ",
-                                target="sqlImage",
-                                body=True,
-                                trigger="hover",
-                            ),
-                            dcc.Textarea(
-                                id='textarea-sql-query',
-                                placeholder='Enter your SQL query here.',
-                                value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
-                                style={'width': '100%', 'height': 230, 'resize': 'none','font-size' :"18px"},
-                            ),
-                            html.Br(),
-                            dbc.Button("Submit", id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right', 'font-size' : '17px'}
-                                        ),
-                            dcc.Loading(
-                                id="loading-2",
-                                children=[html.Div([html.Div(id="Spinner")])],
-                                type="circle",
-                            ),
-                        ], 
-                            style={'width': '35%', 'height': 250, "padding-left" : 10},
-                )
+# sql_query_div = html.Div(children=[
+#                             dbc.Label("SQL Query",
+#                             style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
+#                             html.Img(src='data:image/png;base64, {}'.format(test_base64), id="sqlImage", style={'height' : 20, 'padding-left' : 5}),
+#                             dbc.Popover(
+#                                 "Example : SELECT * FROM nation ",
+#                                 target="sqlImage",
+#                                 body=True,
+#                                 trigger="hover",
+#                             ),
+#                             dcc.Textarea(
+#                                 id='textarea-sql-query',
+#                                 placeholder='Enter your SQL query here.',
+#                                 value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
+#                                 style={'width': '100%', 'height': 300, 'resize': 'none','font-size' :"18px"},
+#                             ),
+#                             html.Br(),
+#                             dbc.Button("Submit", id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+#                                         style={'float': 'right', 'font-size' : '17px'}
+#                                         ),
+#                         ], 
+#                             style={'width': '35%', 'height': 250, "padding-left" : 10},
+#                 )
 
+sql_query_div = html.Div(children=[
+    dbc.CardHeader(
+        children=[dbc.Label("SQL Query", style={"font-family" : "Mach OT W03 Condensed Medium", "font-size" : "20px"}),
+            html.Img(src='data:image/png;base64, {}'.format(test_base64), id="sqlImage", style={'height' : 20, 'padding-left' : 5})]
+    ),
+    dbc.CardBody([
+        dbc.Popover(
+            "Example : SELECT * FROM nation ",
+            target="sqlImage",
+            body=True,
+            trigger="hover",
+        ),
+        dcc.Textarea(
+            id='textarea-sql-query',
+            placeholder='Enter your SQL query here.',
+            value='SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey', 
+            style={'width': '100%', 'height': 280, 'resize': 'none','font-size' :"18px"},
+        ),
+        html.Br(),
+        dbc.Button("Submit", id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+            style={'float': 'right', 'font-size' : '17px'}),
+    ]),
+])
+
+cards = html.Div([
+    dbc.Row(
+        [
+            dbc.Col(dbc.Card(sql_query_div, color="light")),
+        ],
+        className="mb-4",
+    )],
+    style={"width": "30rem", "height" : '50rem'}
+)
 
 natural_language_div = html.Div(children=[
                             dbc.Label("Natural Language Description"),
@@ -243,22 +263,6 @@ natural_language_div = html.Div(children=[
                             style={'width': '65%', 'height': 250, 'padding-left': 10},
                         )
 
-visualization_div = html.Div([
-                        dbc.Label("Visualize Plan",
-                        style={"font-size" : "20px"}),
-                        dcc.Textarea(
-                                id='graph-nl-steps',
-                                placeholder='show flowchart here',
-                                style={'width': '100%', 'height': 230, 'resize': 'none', "font-size" : "18px"},
-                                readOnly=True
-                            ),
-                        html.Br(),
-                        dbc.Button('Detailed View', outline= True, color='primary', className='me-1', size='sm',
-                                        style={'float': 'right', 'margin-bottom': 10, "font-size" : "17px"}, id="visualButton"),
-                    ],
-                        style={'width': '35%','padding-top': 70, 'padding-left': 30, "font-family" : "Mach OT W03 Condensed Medium"}
-                    )
-
 body_right = html.Div([
             dbc.Label("Natural Language Description", style={"font-size" : "20px"}),
             html.Div(children=[], id="table1", style={'width': '100%', "font-size" : "18px"})
@@ -267,25 +271,20 @@ body_right = html.Div([
 )
 
 body_top_left = html.Div(children=[
-                    sql_query_div,
+                    cards,
                     body_right
                 ],
                 style={'width': '100%', 'display': 'flex','padding-top':30, 'padding-left': 20, 'padding-right': 10, 
                 "font-family" : "Mach OT W03 Condensed Medium"}
                 )
 
-body_left = html.Div(children=[body_top_left, visualization_div], style={'width': '100%'})
+body_left = html.Div(children=[body_top_left], style={'width': '100%'})
 
 app.layout = html.Div(children=[
                 modal,
                 heading,
                 body_left
             ])
-
-@app.callback([Output("button",'disabled'), Output("Spinner", "children")], Input("query_submit_button", "value"))
-def input_triggers_spinner(value):
-    time.sleep(1)
-    return value
 
 def toggle_modal(n1, is_open):
     if n1:
@@ -323,9 +322,6 @@ app.callback(
 app.callback(
     Output("collapse8", "is_open"), Input("lineitemAttr", "n_clicks"), State("collapse8", "is_open")
 )(toggle_modal)
-app.callback(
-    Output("collapseNLD", "is_open"), Input("NLDQuery", "n_clicks"), State("collapseNLD", "is_open")
-)(toggle_modal)
 
 app.callback(
     Output("modal-about", "is_open"),
@@ -345,18 +341,15 @@ app.callback(
     State("modal-visual", "is_open"),
 )(toggle_modal) 
 
-def recursive_display(dict_output, div_components = [], title_padding=0, table_padding=1):
+def recursive_display(dict_output, div_components : list = [], title_padding=0, table_padding=1):
     if (dict_output == {}):
-        return [], []
+        return [], div_components
     # print(dict_output)
     dict_keys = list(dict_output.keys())
     dict_values = list(dict_output.values())
     for i in range(len(dict_keys)):
         # print(str(dict_keys[i]))
-        div_component = html.Div(
-                children=[
-                    dbc.ListGroupItem(str(dict_keys[i]) + ": ", style={"font-weight": "bold", "padding-left": title_padding}, id="NLDQuery", href="#", n_clicks=0)
-                ])
+        div_component = html.Div(str(dict_keys[i]) + ": ", style={"font-weight": "bold", "padding-left": title_padding})
         div_components.append(div_component)
         divider = html.Div(className="vl", style={'width':'max-width', 'border-top':'2px solid black', 'padding-right': 10})
         div_components.append(divider)
@@ -384,49 +377,31 @@ def recursive_display(dict_output, div_components = [], title_padding=0, table_p
                 
                 dict_object = {'Query': str(nested_dict_keys[j]), 'Natural Language Description': str(dict_temp_str)}
                 dict_array.append(dict_object)
-        dict_array.extend(subquery_dict_array)
+        # dict_array.extend(subquery_dict_array)
                 # dict_array.append(dict_object)
         for i in range(len(dict_array)):
             if "Natural Language Description" in dict_array[i].keys():
                 val = dict_array[i]['Natural Language Description']
                 print("The extracted dic is : " + val)
                 res = re.findall(r'"([^"]*)"', val)
-                html.Span()
                 print(str(res))
         print(dict_array)
         print("before adding datatable")
         print(div_components)
-        if table_padding == 0 :
-            div_component = dash_table.DataTable(data=dict_array,
-                    style_table={
-                        'padding-left': table_padding,
-                        'padding-top': 10,
-                        'padding-bottom': 10,
-                        'width': 'auto',
-                        'max-height': '500px', 
-                        'overflowY': 'auto'
-                    },
-                    style_header={"font-weight" : "bold"},
-                    style_as_list_view=True,
-                    style_data={'whiteSpace': 'pre-line', 'height': 'auto'},
-                    style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"},
-                    )
-        else : 
-            div_component = html.Div(dbc.Collapse(dbc.Card(dbc.CardBody(dash_table.DataTable(data=dict_array,
-                    style_table={
-                        'padding-left': table_padding,
-                        'padding-top': 10,
-                        'padding-bottom': 10,
-                        'width': 'auto',
-                        'max-height': '500px', 
-                        'overflowY': 'auto'
-                    },
-                    style_header={"font-weight" : "bold"},
-                    style_as_list_view=True,
-                    style_data={'whiteSpace': 'pre-line', 'height': 'auto'},
-                    style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"},
-                    ))), id="collapseNLD", is_open=False))
-        
+        div_component = dash_table.DataTable(data=dict_array,
+                style_table={
+                    'padding-left': table_padding,
+                    'padding-top': 10,
+                    'padding-bottom': 10,
+                    'width': 'auto',
+                    'max-height': '500px', 
+                    'overflowY': 'auto'
+                },
+                style_header={"font-weight" : "bold"},
+                style_as_list_view=True,
+                style_data={'whiteSpace': 'pre-line', 'height': 'auto'},
+                style_cell={'textAlign': 'left', "font-family" : "Mach OT W03 Condensed Medium"},
+                )
         div_components.append(div_component) 
     print(div_components)
     return dict_array, div_components 
