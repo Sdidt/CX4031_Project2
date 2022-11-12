@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 import re
 
 def merge_join_define(node : Node, condition,index_column_dict):

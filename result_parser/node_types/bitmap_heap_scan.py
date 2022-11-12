@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 
 def bitmap_heap_scan_define(node : Node, condition,index_column_dict):
     index_information = index_column_dict[node.information["Index Name"]]

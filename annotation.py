@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 from difflib import SequenceMatcher
 from connection import DB
 from functools import reduce 

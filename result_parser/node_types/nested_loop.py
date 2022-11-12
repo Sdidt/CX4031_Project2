@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 import re
 
 ## Ideally want to identify the 2 tables that are doing the nested looped Join and what is their Join Filter.
