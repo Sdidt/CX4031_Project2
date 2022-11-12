@@ -493,7 +493,7 @@ def update_output(n_clicks, open, value):
     # }
     # set_output = {'query_1': {'subqueries': {}, 'select': 'select n_nationkey', 'from': 'from nation', 'intersect': 'intersect query_2'}, 'query_2': {'subqueries': {}, 'select': 'select s_nationkey', 'from': 'from supplier'}}
     
-    if n_clicks:
+    if n_clicks > 0:
         query_output = process_query(value)
         # query_output = {}
     #     query_output = {'query_1': {'subqueries': 
@@ -510,24 +510,24 @@ def update_output(n_clicks, open, value):
             ],
             size="lg",
             is_open=True
-        )])
-        
-        div_components = []
-        lst_curr_object, div_components = recursive_display(query_output, [])
-        # print("FINAL RESULT: {}".format(div_components))
-        html_output = div_components
-        # print("HTML OUTPUT: {}".format(html_output))
-        print("done executing")
-        # print(html_output)
-        return html.Div(html_output), [dbc.Modal(
-            [
-                dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
-            ],
-            backdrop="static",
-            id="modal-loading",
-            size="lg",
-            is_open=False,
-        )], "false"
+        )]), "false"
+        else:
+            div_components = []
+            lst_curr_object, div_components = recursive_display(query_output, [])
+            # print("FINAL RESULT: {}".format(div_components))
+            html_output = div_components
+            # print("HTML OUTPUT: {}".format(html_output))
+            print("done executing")
+            # print(html_output)
+            return html.Div(html_output), [dbc.Modal(
+                [
+                    dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
+                ],
+                backdrop="static",
+                id="modal-loading",
+                size="lg",
+                is_open=False,
+            )], "false"
 
 if __name__ == '__main__':
     app.run_server(debug=True)

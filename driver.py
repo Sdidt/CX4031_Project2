@@ -4,11 +4,11 @@ from annotation import Annotator
 
 def process_query(query):
     db = DB()
-    # try:
-    preprocessor = PreProcessor(query, db)
-    # except Exception as e:
-    #     print("Error: {}".format(e))
-    #     return {}
+    try:
+        preprocessor = PreProcessor(query, db)
+    except Exception as e:
+        print("Error: {}".format(e))
+        return {}
 
     print("\n######################################################################################################################\n")
 
