@@ -120,7 +120,7 @@ class PreProcessor:
     def handle_as_keyword(self, curr_query, curr_component: list, tokens, t: token.SQLToken, i, last_keyword_token, last_comma_index):
         if t.value not in curr_query:
             curr_query[t.value.lower()] = {}
-        aggregate = curr_query[last_keyword_token.value][-1]
+        aggregate = curr_query[last_keyword_token.value.lower()][-1]
         i += 1
         alias: token.SQLToken = tokens[i]
         curr_component.append(alias.value.lower())
@@ -144,7 +144,7 @@ class PreProcessor:
     def replace_alias_with_expression(self, curr_query, t: token.SQLToken):
         if "as" not in curr_query:
             return t
-        if t.value in curr_query["as"]:
+        if t.value.lower() in curr_query["as"]:
             t.value = curr_query["as"][t.value.lower()]
         return t
 
@@ -283,6 +283,7 @@ class PreProcessor:
             t = self.prepend_table_name_to_column(curr_query, t, curr_level)
             t = self.replace_alias_with_expression(curr_query, t)
             # print("Value: " + str(t.value))
+            # self.print_token_debug_info(t)
 
             if (t.value.lower() == ";"):
                 semicolon_present = True
@@ -302,6 +303,11 @@ class PreProcessor:
   
                 # print(t.parenthesis_level)
                 # print(last_keyword_token.parenthesis_level)
+                if (t.value.lower() == "first" or t.value.lower() == "last" or t.value.lower() == "distinct"):
+                    curr_query_components[last_keyword_token.value.lower()] = " ".join(curr_component[:-1])
+                    i += 1 
+                    continue
+
 
                 # new keyword in same level query
                 if (t.parenthesis_level == last_keyword_token.parenthesis_level):
@@ -351,10 +357,14 @@ class PreProcessor:
                         # print("End of " + clause + " tokens")
                         curr_query, clause_list = self.extract_where_having(curr_query, curr_query_components, where_tokens, [], last_keyword_token, query_alias, curr_level)
                         curr_component.extend(clause_list)
-                        last_comma_index = i + 1                                                
+                        last_comma_index = i + 1   
+                        continue                                             
 
                     if (t.value.lower() == "union" or t.value.lower() == "intersect" or t.value.lower() == "minus"):
+                        print("reached set op")
                         i += 1
+                        for t in tokens[i:]:
+                            print(t.value.lower())
                         set_op = t.value.lower()
                         t = tokens[i]
                         self.curr_query_num[query_alias][curr_level] += 1
@@ -521,7 +531,7 @@ if __name__ == "__main__":
 
     db = DB()
 
-    preprocessor = PreProcessor(set_query, db)
+    preprocessor = PreProcessor(where_subquery, db)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)

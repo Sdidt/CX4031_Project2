@@ -4,7 +4,11 @@ from annotation import Annotator
 
 def process_query(query):
     db = DB()
+    # try:
     preprocessor = PreProcessor(query, db)
+    # except Exception as e:
+    #     print("Error: {}".format(e))
+    #     return {}
 
     print("\n######################################################################################################################\n")
 
@@ -20,7 +24,12 @@ def process_query(query):
     print()
     print(preprocessor.decomposed_query)
     print(preprocessor.index_column_dict)
-    annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
+    try:
+        annotator = Annotator(query, preprocessor.decomposed_query, preprocessor.query_components, db, preprocessor.index_column_dict)
+        
+    except Exception as e:
+        print(e)
+        return {}
 
     # print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
     annotator.annotate_nodes()
@@ -185,10 +194,48 @@ if __name__ == "__main__":
         AND n_name = 'CANADA'
     ORDER BY
         s_name
+        """,
+        """
+        select * from part where p_brand = 'Brand#13' and p_size <> (select max(p_size) from part);
+        """
+        """
+        select n_nationkey from nation union select s_nationkey from supplier
+        """,
+        """
+        SELECT 
+     p_brand,
+     p_type,
+     p_size,
+     COUNT(DISTINCT ps_suppkey) AS supplier_cnt
+FROM
+     partsupp,
+     part
+WHERE
+     p_partkey = ps_partkey
+     AND p_brand <> 'Brand#45'
+     AND p_type NOT LIKE 'MEDIUM POLISHED%'
+     AND p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+     AND ps_suppkey NOT IN (
+		SELECT
+			s_suppkey
+		FROM
+			supplier
+		WHERE
+			s_comment LIKE '%Customer%Complaints%'
+     )
+GROUP BY
+     p_brand,
+     p_type,
+     p_size
+ORDER BY
+     supplier_cnt DESC,
+     p_brand,
+     p_type,
+     p_size
         """
     ]
 
-    process_query(sample_queries[1])
+    process_query(sample_queries[-1])
     
 
 

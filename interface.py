@@ -1,5 +1,6 @@
 from dash import Dash, html, dcc, Input, Output, State, dash_table
 import dash_bootstrap_components as dbc
+import time
 from driver import process_query
 # import plotly.express as px
 # import pandas as pd
@@ -176,6 +177,15 @@ modal = html.Div([
             size="lg",
             is_open=False,
         ),
+        html.Div([dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
+            ],
+            backdrop="static",
+            id="modal-loading",
+            size="lg",
+            is_open=False,
+        )], id="loadingdiv")
 ])
 
 heading = dbc.NavbarSimple(
@@ -261,6 +271,7 @@ body_top_left = html.Div(children=[
 
 body_left = html.Div(children=[body_top_left, visualization_div], style={'width': '100%'})
 
+popup = html.Div(dbc.Spinner(color="primary"), id="spinner")
 
 app.layout = html.Div(children=[
                 modal,
@@ -301,14 +312,14 @@ def recursive_display(dict_output, div_components: list = [], title_padding=0, t
             else:
                 dict_temp_array = nested_dict_values[j]
                 dict_temp_str = ""
-                for item in dict_temp_array:
-                    dict_temp_str += item + "\n"
+                for i, item in enumerate(dict_temp_array):
+                    dict_temp_str += "{}. ".format(i + 1) + item + "\n"
                 
                 dict_object = {'Query': str(nested_dict_keys[j]), 'Natural Language Description': str(dict_temp_str)}
                 dict_array.append(dict_object)
         # dict_array.extend(subquery_dict_array)
                 # dict_array.append(dict_object)
-        # print(dict_array)
+        print(dict_array)
         # print("before adding datatable")
         # print(div_components)
         div_component = dash_table.DataTable(data=dict_array, 
@@ -379,11 +390,33 @@ app.callback(
 
 
 @app.callback(
-    Output('table1', 'children'),
+    Output('modal-loading', 'is_open'),
     Input('query_submit_button', 'n_clicks'),
+)
+def open_loading(n_clicks):
+    if n_clicks>0 and False:
+        return True
+
+# @app.callback(
+#     Output("modal-visual", "is_open"),
+#     Input("visualButton", "n_clicks"),
+#     State("modal-visual", "is_open"),
+# )
+
+# def load_output(n):
+#     if n:
+#         time.sleep(5)
+#         return {'display':'none'}
+
+
+@app.callback(
+    Output('table1', 'children'),
+    # Output('loadingdiv', 'children'),
+    Input('query_submit_button', 'n_clicks'),
+    State("modal-loading", "is_open"),
     State('textarea-sql-query', 'value')
 )
-def update_output(n_clicks, value):
+def update_output(n_clicks, open, value):
     # print("QUERY OUTPUT: {}".format(query_output))
     # html_output = []
     # dict_output = {'query_1': {'subqueries': 
@@ -393,10 +426,19 @@ def update_output(n_clicks, value):
     # }
     # set_output = {'query_1': {'subqueries': {}, 'select': 'select n_nationkey', 'from': 'from nation', 'intersect': 'intersect query_2'}, 'query_2': {'subqueries': {}, 'select': 'select s_nationkey', 'from': 'from supplier'}}
     
-    if n_clicks > 0:
+    if n_clicks:
+        print("here")
         query_output = process_query(value)
+        if (query_output == {}):
+            print("display error message")
+            return 
+    #     query_output = {'query_1': {'subqueries': 
+    #     {'subquery_1': {'subqueries': {}, 'from partsupp P1 , supplier S , nation': ['The clause "from p1" is implemented using Seq Scan because no other option is available.', 'The clause "from s" is implemented using Seq Scan because it requires 44.62, 10351967.39 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "from nation_1" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'": ['The clause "where nation_1.n_name = \'GERMANY\'" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where s.s_nationkey = nation_1.n_nationkey" is implemented using Hash Join.', 'The clause "where p1.ps_suppkey = s.s_suppkey" is implemented using Hash Join.']}}
+    #     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
+    #     }
+    # }
         div_components = []
-        lst_curr_object, div_components = recursive_display(query_output)
+        lst_curr_object, div_components = recursive_display(query_output, [])
         # print("FINAL RESULT: {}".format(div_components))
         html_output = div_components
         # print("HTML OUTPUT: {}".format(html_output))

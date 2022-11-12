@@ -1,21 +1,37 @@
-from postorder import Node
+from node import Node
 from difflib import SequenceMatcher
 from connection import DB
 from functools import reduce 
 import operator
 from result_parser.result_parser import ResultParser
 from result_parser.node_types.default_node import default_define
+"""
+This module is to process query with the relevant metadata in the form of a tree structure and then extract the QEP and AQPs. 
 
-
+Afterwhich, annotated results regarding the choice of operation is then produced.
+"""
 
 def getFromDict(dataDict, mapList):
+    """
+    
+    """
     return reduce(operator.getitem, mapList, dataDict)
 
 def setInDict(dataDict, mapList, value):
+    """
+    
+    """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
 
 class Annotator:
+    """
+    A class the converts query dictionary into meaningful tree structure.
+    """
+
     def __init__(self, query, decomposed_query, query_component_dict, db: DB,index_column_dict ) -> None:
+        """
+        Initializes the class Annotator 
+        """
         self.query = query
         self.db = db
         self.config_paras_scan = ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
@@ -29,6 +45,19 @@ class Annotator:
         self.index_column_dict = index_column_dict
 
     def generate_AQPs(self):
+        """
+        Generates AQP for all different cases 
+
+        1. AQP with only sequential scan enabled
+        2. AQP with only index scan enabled
+        3. AQP with only index-only scan enabled
+        4. AQP with only bitmap scan enabled
+        5. AQP with only TID scan enabled
+        6. AQP with only hash join enabled
+        7. AQP with only nested loop join enabled
+        8. AQP with only merge join enabled
+        """
+
         print("\n######################################################################################################################\n")
 
         print("GENERATING AQPS")
@@ -68,8 +97,18 @@ class Annotator:
 
         return AQPs
 
-
     def capture_nodes(self, dct, parent=None, subquery_level=0):
+        """
+        Convert dictionary into a tree structure made up of nodes to faciliate further processing.
+
+        This is done by recursively calling this function.
+
+        Parameter dct: query plan in dictionary format
+
+        Parameter parent: the parent of the current node being captured
+
+        Parameter subquery_level: the level at which the the query is at (ie. main, subquery)
+        """
         nodes = []
 
         cur = Node(dct, subquery_level)
@@ -98,10 +137,30 @@ class Annotator:
         return nodes
 
     def generate_QEP(self):
+        """
+        Generates the QEP by returning the output returned by database then passing it to capture_nodes
+        """
         output_plan = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
         return self.capture_nodes(output_plan)
         
     def traverse_and_find_best_match(self, node: Node, key, decomposed_query: dict, query_component_dict: dict, component_mapping: dict, curr_key_chain: list, i=0):
+        """
+        Matches the node to the sql query 
+
+        Parameter node: node
+
+        Parameter key:
+
+        Parameter decomposed_query:
+
+        Parameter query_component_dict:
+
+        Parameter component_mapping: 
+
+        Parameter curr_key_chain:
+
+        Parameter i: 
+        """
         relevant_info = node.keywords
         optimal_key_chain = []
         optimal_clause = None
@@ -110,6 +169,7 @@ class Annotator:
         # print(curr_key_chain)
         # print(decomposed_query)
         v = relevant_info[key]
+        merge_join_order_by_explanation = ""
         for k in decomposed_query.keys():
             relevant_decomposed_query = decomposed_query[k]
             relevant_query_component = query_component_dict[k]
@@ -121,7 +181,7 @@ class Annotator:
                 if "subqueries" in relevant_decomposed_query:
                     # print("Recursive subquery call")
                     # print(curr_key_chain + ["subqueries"])
-                    subproblem_optimal_key_chain, subproblem_optimal_clause, subproblem_optimal_score = self.traverse_and_find_best_match(node, key, relevant_decomposed_query["subqueries"], relevant_query_component["subqueries"], relevant_component_mapping["subqueries"], curr_key_chain + ["subqueries"], i + 1)
+                    subproblem_optimal_key_chain, subproblem_optimal_clause, subproblem_optimal_score, merge_join_order_by_explanation = self.traverse_and_find_best_match(node, key, relevant_decomposed_query["subqueries"], relevant_query_component["subqueries"], relevant_component_mapping["subqueries"], curr_key_chain + ["subqueries"], i + 1)
                     # print("subproblem_optimal_key_chain: {}".format(subproblem_optimal_key_chain))
                     if subproblem_optimal_score > curr_optimal_score:
                         print("Replacing")
@@ -132,7 +192,7 @@ class Annotator:
                 original_query_component = relevant_query_component.get(key, None)
                 if original_query_component is None:
                     continue
-                curr_optimal_score = 0
+                # curr_optimal_score = 0
                 print("\n######################################################################################################################\n")   
                 print("MATCHING CLAUSE {}".format(v))   
                 # print(relevant_decomposed_query)      
@@ -144,17 +204,30 @@ class Annotator:
                         curr_optimal_score = curr_score
                         optimal_clause = v
                         optimal_key_chain = curr_key_chain.copy()
+                        if node.type == "Merge Join":
+                            join_attributes = node.join_filters[0].split(" ")
+                            print("JOIN ATTIRBUTES: {}".format(join_attributes))
+                            for join_attribute in join_attributes:
+                                if "order by" in relevant_query_component:
+                                    if join_attribute in relevant_query_component["order by"].lower():
+                                        merge_join_order_by_explanation += "Further, sorting by the join attribute {} is performed using clause {}.".format(join_attribute, relevant_query_component["order by"])
                     print("Similarity Score: {}".format(curr_score))
                     curr_key_chain.pop()
                 if curr_optimal_score > 0.65:
                     print("Fairly good match is found: {}".format(optimal_clause))
                 print("\n######################################################################################################################\n")
             curr_key_chain.pop()
-        return optimal_key_chain, optimal_clause, curr_optimal_score
+        return optimal_key_chain, optimal_clause, curr_optimal_score, merge_join_order_by_explanation
 
     def find_match_in_decomposed_query(self, node: Node, i=0):
+        """
+        
+        Parameter node: 
+
+        Parameter i: 
+        """
         for k, v in node.keywords.items():
-            optimal_key_chain, optimal_clause, similarity_score = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
+            optimal_key_chain, optimal_clause, similarity_score, merge_join_order_by_explanation = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
             print("Optimal key chain: {}".format(optimal_key_chain))
             print("Optimal clause: {}".format(optimal_clause))
             print("Similarity Score: {}".format(similarity_score))
@@ -186,7 +259,9 @@ class Annotator:
                 elif "join" in node.type.lower() or "nested loop" in node.type.lower():
                     print("FOUND JOIN NODE IN MATCH QUERY")
                     cost_dict, choice_explanation = self.cost_comparison_join(node, self.config_paras_join)   
-                    explanation += choice_explanation        
+                    explanation += choice_explanation 
+                    if node.type == "Merge Join":
+                        explanation += merge_join_order_by_explanation       
                 else:
                     explanation += "."
                 if original_query_component not in relevant_component_mapping:
@@ -199,11 +274,23 @@ class Annotator:
         return
     
     def annotate_nodes(self):
+        """
+        
+        """
         for node in self.QEP:
-            # node.print_debug_info()
+            node.print_debug_info()
             self.find_match_in_decomposed_query(node)
 
     def explain_costs(self, cost_dict, qep_node_type, qep_cost):
+        """
+        Returns a string which explains why an operation is chosen instead of the alternatives
+
+        Parameter cost_dict: 
+
+        Parameter qep_node_type: 
+
+        Parameter qep_cost: 
+        """
         if len(cost_dict) == 1:
             return " because no other option is available."
         ratios = {}
@@ -225,12 +312,17 @@ class Annotator:
         elif len(ratios) > 1:
             choice_explanation = " because it requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + ", ".join([str(node_type) for node_type in (ratios.keys())]) + " respectively."
         if len(anomalous_ratios) == 1:
-            choice_explanation += " However, surprisingly, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + "{:.2f}".format(list(anomalous_ratios.values())[0]) + " less operations than " + qep_node_type + "."
+            choice_explanation += " However, using " + "{}".format(list(anomalous_ratios.keys())[0]) + " requires " + "{:.2f}".format(list(anomalous_ratios.values())[0]) + " less operations than " + qep_node_type + "."
         elif len(anomalous_ratios) > 1:
-            choice_explanation += " However, surprisingly, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + qep_node_type + "."
+            choice_explanation += " However, using " + ", ".join([str(node_type) for node_type in (anomalous_ratios.keys())]) + " requires " + ", ".join(["{:.2f}".format(ratio) for ratio in list(ratios.values())]) + " less operations than " + qep_node_type + "."
         return choice_explanation
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
+        """
+        Parameter node: scan node of QEP
+
+        Parameter config_paras_scan: ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        """
         qep_node = node
         qep_node_type = qep_node.type
         qep_relation = qep_node.information["Relation Name"]
@@ -253,7 +345,7 @@ class Annotator:
 
             for node in AQP:
                 # to find anotherrr forrm of scan
-                node.print_debug_info()
+                # node.print_debug_info()
                 aqp_node_type = node.type
                 if node.type == "Bitmap Index Scan":
                     is_bitmap_index_scan = True
@@ -294,6 +386,14 @@ class Annotator:
         return cost_dict, choice_explanation
 
     def cost_comparison_join(self, node: Node, config_para_for_join):
+        """
+        Compares costs with other types of joins in the AQP
+
+        Parameter node: join node of QEP
+
+        Parameter config_para_for_join: ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
+        """
+
         qep_node_type = node.type
         qep_filter = node.join_filters[0]
 

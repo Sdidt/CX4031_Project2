@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 
 ## Add in Plan Rows or Actual Rows retrieved from the relation?? 
 def seq_scan_define(node : Node, condition,index_column_dict):

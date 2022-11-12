@@ -1,4 +1,4 @@
-from postorder import Node
+from node import Node
 
 def aggregate_define(node : Node, condition,index_column_dict):
     # For plans of the aggregate type: SortAggregate, HashAggregate, PlainAggregate
