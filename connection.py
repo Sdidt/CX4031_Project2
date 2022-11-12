@@ -8,6 +8,7 @@ class DB:
     def __init__(self, host="127.0.0.1", database="TPC-H", user=os.getenv('DB_USERNAME'), password=os.getenv('DB_PASSWORD'), port=5432) -> None:
         self.conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
         self.cursor = self.conn.cursor()
+        self.execute("SET statement_timeout = '180s'")
         print("Connection established")
         return
     

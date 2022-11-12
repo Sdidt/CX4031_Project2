@@ -283,7 +283,7 @@ class PreProcessor:
             t = self.prepend_table_name_to_column(curr_query, t, curr_level)
             t = self.replace_alias_with_expression(curr_query, t)
             # print("Value: " + str(t.value))
-            self.print_token_debug_info(t)
+            # self.print_token_debug_info(t)
 
             if (t.value.lower() == ";"):
                 semicolon_present = True
