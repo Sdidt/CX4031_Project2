@@ -150,6 +150,52 @@ list_group = dbc.ListGroup(
     flush=True,
 )
 
+
+sql_query_example = html.Div(
+    dbc.Accordion(
+        [
+            dbc.AccordionItem(
+                "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey", title="Query 1"
+            ),
+            dbc.AccordionItem(
+                "SELECT * FROM nation WHERE nation.n_nationkey = 3", title="Query 2"
+            ),
+            dbc.AccordionItem(
+                "SELECT ps_partkey PS, sum(ps_supplycost * ps_availqty) as value FROM partsupp P, supplier, nation WHERE" +
+                " P.ps_suppkey = s_suppkey AND NOT s_nationkey = n_nationkey AND n_name = 'GERMANY' AND ps_supplycost > 20" +
+                " and s_acctbal > 10 GROUP BY ps_partkey HAVING sum(ps_supplycost * ps_availqty) > ( SELECT sum(ps_supplycost *" +
+                " ps_availqty) * 0.0001000000 FROM partsupp P1, supplier S, nation WHERE ps_suppkey = s_suppkey AND s_nationkey" +
+                " = n_nationkey AND n_name = 'GERMANY') order by value;", title="Query 3"
+            ),
+            dbc.AccordionItem(
+                "SELECT n_nationkey FROM nation UNION SELECT s_nationkey FROM supplier", title="Query 4"
+            ),
+            dbc.AccordionItem(
+                "SELECT * FROM part WHERE p_brand = 'Brand#13' AND p_size <> (SELECT max(p_size) FROM part);", title="Query 5"
+            ),
+            dbc.AccordionItem(
+                "SELECT n_nationkey FROM nation WHERE n_nationkey = 3 UNION SELECT s_nationkey FROM supplier", title="Query 6"
+            ),
+            dbc.AccordionItem(
+                "SELECT l_returnflag, l_linestatus, sum(l_quantity) AS sum_qty, sum(l_extendedprice) AS sum_base_price," +
+                " sum(l_extendedprice * (1 - l_discount)) AS sum_disc_price, sum(l_extendedprice * (1 - l_discount) *" +
+                " (1 + l_tax)) AS sum_charge FROM lineitem WHERE l_shipdate <= date '1998-12-01' GROUP BY l_returnflag," +
+                " l_linestatus ORDER BY sum_disc_price, l_linestatus", title="Query 7"
+            ),
+            dbc.AccordionItem(
+                "SELECT sum(l_extendedprice * l_discount) AS revenue FROM lineitem WHERE l_extendedprice > 100;", title="Query 8"
+            ),
+            dbc.AccordionItem(
+                "SELECT p_brand, p_type, p_size, COUNT(DISTINCT ps_suppkey) AS supplier_cnt FROM partsupp, part WHERE p_partkey" +
+                " = ps_partkey AND p_brand <> 'Brand#45' AND p_type NOT LIKE 'MEDIUM POLISHED%' AND p_size IN (49, 14, 23, 45, 19," +
+                " 3, 36, 9) AND ps_suppkey NOT IN ( SELECT s_suppkey FROM supplier WHERE s_comment LIKE '%Customer%Complaints%')" +
+                " GROUP BY p_brand, p_type, p_size ORDER BY supplier_cnt DESC, p_brand, p_type, p_size", title="Query 9"
+            ),
+        ],
+        start_collapsed=True,
+    ),
+)
+
 modal = html.Div([
         dbc.Modal(
             [
@@ -167,6 +213,16 @@ modal = html.Div([
                 list_group
             ],
             id="modal-datasets",
+            size="lg",
+            is_open=False,
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Example query")),
+                dbc.ModalBody("This is the SQL query example"),
+                sql_query_example
+            ],
+            id="modal-example",
             size="lg",
             is_open=False,
         ),
@@ -258,6 +314,8 @@ sql_query_div = html.Div(children=[
         ),
         html.Br(),
         dbc.Button("Submit", id='query_submit_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
+            style={'float': 'right', 'font-size' : '17px'}),
+        dbc.Button("Example", id='example_button', n_clicks=0, outline= True, color='primary', className='me-1', size='sm',
             style={'float': 'right', 'font-size' : '17px'}),
     ]),
 ])
@@ -413,6 +471,10 @@ def toggle_modal(n1, is_open):
     if n1:
         return not is_open
     return is_open
+
+app.callback(
+    Output("modal-example", "is_open"), Input("example_button", "n_clicks"), State("modal-example", "is_open"),
+)(toggle_modal)
 
 app.callback(
     Output("collapse1", "is_open"), Input("custAttr", "n_clicks"), State("collapse1", "is_open"),
