@@ -521,7 +521,7 @@ if __name__ == "__main__":
 
     db = DB()
 
-    preprocessor = PreProcessor(set_query, db)
+    preprocessor = PreProcessor(where_subquery, db)
     # preprocessor.print_query_debug_info()
     print(preprocessor.tables)
     print(preprocessor.columns)

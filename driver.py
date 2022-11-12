@@ -185,10 +185,13 @@ if __name__ == "__main__":
         AND n_name = 'CANADA'
     ORDER BY
         s_name
+        """,
+        """
+        select * from part where p_brand = 'Brand#13' and p_size <> (select max(p_size) from part);
         """
     ]
 
-    process_query(sample_queries[1])
+    process_query(sample_queries[-1])
     
 
 

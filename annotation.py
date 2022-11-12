@@ -132,7 +132,7 @@ class Annotator:
                 original_query_component = relevant_query_component.get(key, None)
                 if original_query_component is None:
                     continue
-                curr_optimal_score = 0
+                # curr_optimal_score = 0
                 print("\n######################################################################################################################\n")   
                 print("MATCHING CLAUSE {}".format(v))   
                 # print(relevant_decomposed_query)      
