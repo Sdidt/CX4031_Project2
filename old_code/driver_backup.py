@@ -58,7 +58,32 @@ def process_query(query, host, dbname, username, password, port):
         print(e)
         return {}
 
+    # print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
     annotator.annotate_nodes()
+
+    # j = 1
+    # for node in annotator.QEP:
+    #     print("STEP {}".format(j))
+    #     j = j + 1
+
+    #     node_type = node.type
+    #     print("NODE TYPE: {}".format(node_type))
+    #     print("ESTIMATED COST: {}".format(node.get_estimated_cost()))
+    #     print("MAPPING: {}".format(node.mapping()))
+    #     # print("RELEVANT INFORMATION: \n{}".format(node.get_relevant_info()))
+    #     print("OTHER INFORMATION: {}".format(node.information))
+    #     if not node.parent[0] is None:
+    #         print("PARENT NODE TYPE: {}".format(node.parent[0].type))
+    #     print("SUBQUERY LEVEL: {}".format(node.subquery_level))
+        
+    #     children = node.children
+    #     if children:
+    #         i = 1
+    #         for child in children:
+    #             print("CHILD {} NODE TYPE: {}".format(i, node.children[i-1].type))
+    #             i = i + 1
+    #     print("\n")
+    # print("TZIYU$$$$$$$$$$$$$$$$$$$$$$$$$$$")
 
     print("\n######################################################################################################################\n")
 
@@ -74,8 +99,6 @@ def process_query(query, host, dbname, username, password, port):
 
 if __name__ == "__main__":
     
-    # for testing this file individually
-
     sample_queries = [
         """
         select * from customer C,  orders O where C.c_custkey = O.o_custkey
@@ -240,3 +263,6 @@ ORDER BY
     ]
 
     process_query(sample_queries[-1])
+    
+
+

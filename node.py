@@ -1,14 +1,15 @@
 from __future__ import annotations
 class Node():
     """
-    A class representing a operation in the query plan in the form of a node where information related to the operation and parent and children nodes can be keep tracked of.
+    A class representing an operation in the query plan in the form of a node where information 
+    related to the operation and parent and children nodes can be keep tracked of.
     """
 
     def __init__(self, data: dict, subquery_level) -> None:
         """
-        This initializes each node type
+        Constructor for Node class
 
-        Parameter data: a dictionary that consists of the metadata related to the operation
+        Parameter data: a dictionary that consists of the metadata related to the operation (extraced from PostgreSQL output for "EXPLAINA ANALYZE")
 
         Parameter subquery_level: subquery level that shows the level at which the operation is conducted in the query
         """
@@ -33,33 +34,32 @@ class Node():
         if (self.type == "Sort"):
             self.type = self.information["Sort Method"] + " Sort"
 
-
     def add_child(self, child: Node) -> None:
         """
         Adds child node into child list of the current node
 
-        Parameter child: a child node that is the child of current node
+        Parameter child: a child Node that is the child of current Node
         """
         self.children.append(child)
 
-
     def add_parent(self, parent: Node) -> None:
         """
-        Adds parent node into parent list of the current node
+        Adds parent Node into parent list of the current Node
 
-        Parameter parent: a parent node that is the parent of current node
+        Parameter parent: a parent Node that is the parent of current Node
         """
 
         self.parent.append(parent)
 
-
     def get_estimated_cost(self):
         """
         Calculates the estimated cost of the operation in the current node and returns the cost in integer
-        
         """
         # startup_cost = self.information["Startup Cost"]
+        # "Total Cost" attribute gives per-loop average
         qep_cost = self.information["Total Cost"] * self.information["Actual Loops"]
+
+        # for these operations, the total cost must be taken as is, since the child operations are significant and truly contribute to the cost
         if self.type in ["Merge Join", "Nested Loop", "Index Nested Loop", "Bitmap Heap Scan"]:
             return qep_cost
         children: list[Node] = self.children
@@ -71,7 +71,6 @@ class Node():
         if diff < 0:
             return qep_cost
         return diff
-
 
     def mapping(self):
         """
@@ -114,12 +113,11 @@ class Node():
             lst.append(dct)
         return lst
 
-
     def revert_condition(self, condition: str):
         """
         Manipulates the string to a form which fits another use case
 
-        Parameter condition: string 
+        Parameter condition: filter/join condition in string form 
         """
         return " ".join(condition.split(" ")[::-1])
 
@@ -127,7 +125,7 @@ class Node():
         """
         Removes the punctations in the string
 
-        Parameter condition: string
+        Parameter condition: filter/join condition in string form 
         """
         split_condition = condition.split("::", 1)
         if len(split_condition) == 1:
@@ -146,7 +144,6 @@ class Node():
             relevant_info["group by"] = group
         return relevant_info
 
-    # complete: BUT need to handle case when sort is used before sort merge join
     def node_sort(self):
         """
         Returns a dictionary relevant to a sort node that helps with mapping to query 
@@ -159,7 +156,6 @@ class Node():
     
         return relevant_info
     
-    # complete
     def node_seq_scan(self):
         """
         Returns a dictionary relevant to a seq scan node that helps with mapping to query 
@@ -183,7 +179,6 @@ class Node():
 
         return relevant_info
 
-    # complete
     def node_index_scan(self):
         """
         Returns a dictionary relevant to an index scan node that helps with mapping to query 
@@ -241,7 +236,6 @@ class Node():
 
         return relevant_info
 
-    # complete
     def node_hash(self):
         """
         Returns a dictionary relevant to a hash node that helps with mapping to query 
@@ -249,8 +243,10 @@ class Node():
         relevant_info = {}
         return relevant_info
 
-    # complete
     def node_hash_join(self):
+        """
+        Returns a dictionary relevant to a hash join node that helps with mapping to query 
+        """
         relevant_info = {}
         if 'Hash Cond' in self.information:
             condition = self.information['Hash Cond'][1:-1]
@@ -301,7 +297,7 @@ class Node():
         """
         Returns the filter condition and the index name from the descendant node of a nested loop node when the node itself does not have a filter
 
-        This is to deal with the special case when indexing is performed on the one of the relation etc .
+        This is to deal with the special case when indexing is performed on the one of the relation (e.g. Index nested loop join)
         """
         print("BEGIN TRACE")
         filter = ""
@@ -329,5 +325,3 @@ class Node():
         # print("MAPPING: {}".format(self.mapping()))
         # print("RELEVANT INFORMATION: \n{}".format(self.get_relevant_info()))
         print("OTHER INFORMATION: {}".format(self.information))
-
-# NOTE: check old_code/postorder_for_testing.py to quickly test out changes in this file
