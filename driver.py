@@ -2,8 +2,12 @@ from connection import DB
 from preprocessing import PreProcessor
 from annotation import Annotator
 import json
-def process_query(query):
-    db = DB()
+def process_query(query, host, dbname, username, password, port):
+    try:
+        db = DB(host, dbname, username, password, port)
+    except Exception as e:
+        print("Error: {}".format(e))
+        return {"connection-error": True}
     try:
         preprocessor = PreProcessor(query, db)
     except Exception as e:

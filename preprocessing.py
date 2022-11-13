@@ -476,7 +476,7 @@ class PreProcessor:
                                 t = tokens[i]
                             else:
                                 break
-                        i -= 1
+                        # i -= 1
                         # print(clause + " clause tokens: ")
                         # for tok in where_tokens:
                         #     print("Value: " + str(tok.value))

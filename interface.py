@@ -219,7 +219,7 @@ modal = html.Div([
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("Example query")),
-                dbc.ModalBody("This is the SQL query example"),
+                dbc.ModalBody("Here are some SQL query examples"),
                 sql_query_example
             ],
             id="modal-example",
@@ -243,6 +243,24 @@ modal = html.Div([
             size="lg",
             is_open=False,
             id="error-message"
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Error")]),
+                dbc.ModalBody("The connection to the DB was not successful. Kindly check your DB connection parameter inputs!"),
+            ],
+            size="lg",
+            is_open=False,
+            id="connection-error-message"
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader([dbc.ModalTitle("Error")]),
+                dbc.ModalBody("The port specified is incorrect. Kindly check your port parameter, which must be an integer!"),
+            ],
+            size="lg",
+            is_open=False,
+            id="port-error-message"
         ),
         dbc.Modal(
             [
@@ -525,6 +543,7 @@ app.callback(
 
 @app.callback(
     Output('modal-database', 'is_open'),
+    Output('port-error-message', 'is_open'),
     Input('dbdetails_submit_button', 'n_clicks'),
     State('host-input', 'value'),
     State('dbname-input', 'value'),
@@ -534,7 +553,12 @@ app.callback(
 )
 def get_database_inputs(n_clicks, host, dbname, username, password, port):
     if n_clicks:
-        return True
+        try:
+            port = int(port)
+        except Exception as e:
+            print("display error message: {}".format(e))
+            return False, True
+        return True, False
 
 @app.callback(
     Output('modal-loading', 'is_open'),
@@ -565,10 +589,16 @@ def open_loading(n_clicks, value, loading):
     Output('loadingdiv', 'children'),
     Output('loading-boolean', 'children'),
     Output('error-message', 'is_open'),
+    Output('connection-error-message', 'is_open'),
     Input('query_submit_button', 'n_clicks'),
-    State('textarea-sql-query', 'value')
+    State('textarea-sql-query', 'value'),
+    State('host-input', 'value'),
+    State('dbname-input', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    State('port-input', 'value')
 )
-def update_output(n_clicks, value):
+def update_output(n_clicks, value, host, dbname, username, password, port):
     # print(open)
     # open_loading(n_clicks, value, "", "")
     # print(value)
@@ -583,16 +613,23 @@ def update_output(n_clicks, value):
     # set_output = {'query_1': {'subqueries': {}, 'select': 'select n_nationkey', 'from': 'from nation', 'intersect': 'intersect query_2'}, 'query_2': {'subqueries': {}, 'select': 'select s_nationkey', 'from': 'from supplier'}}
     
     if n_clicks > 0:
-        query_output = process_query(value)
+        print("HOST: {}".format(host))
+        print("DB NAME: {}".format(dbname))
+        print("USERNAME: {}".format(username))
+        print("PASSWORD: {}".format(password))
+        print("PORT: {}".format(port))
+        query_output = process_query(value, host, dbname, username, password, port)
         # query_output = {}
     #     query_output = {'query_1': {'subqueries': 
     #     {'subquery_1': {'subqueries': {}, 'from partsupp P1 , supplier S , nation': ['The clause "from p1" is implemented using Seq Scan because no other option is available.', 'The clause "from s" is implemented using Seq Scan because it requires 44.62, 10351967.39 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "from nation_1" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'GERMANY'": ['The clause "where nation_1.n_name = \'GERMANY\'" is implemented using Seq Scan because it requires 2.90, 277777779.19 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where s.s_nationkey = nation_1.n_nationkey" is implemented using Hash Join.', 'The clause "where p1.ps_suppkey = s.s_suppkey" is implemented using Hash Join.']}}
     #     , 'from partsupp P , supplier , nation': ['The clause "from p" is implemented using Seq Scan because no other option is available.', 'The clause "from nation" is implemented using Seq Scan because no other option is available.', 'The clause "from supplier" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.'], "where P.ps_suppkey = s_suppkey and not s_nationkey = n_nationkey and n_name = 'GERMANY' and ps_supplycost > 20 and s_acctbal > 10": ['The clause "where p.ps_supplycost > \'20\'" is implemented using Seq Scan because no other option is available.', 'The clause "where nation.n_name = \'GERMANY\'" is implemented using Seq Scan because no other option is available.', 'The clause "where supplier.s_acctbal > \'10\'" is implemented using Seq Scan because it requires 124.21, 28818445.30 less operations than Bitmap Heap Scan, Index Scan respectively.', 'The clause "where supplier.s_nationkey <> nation.n_nationkey" is implemented using Nested Loop.', 'The clause "where p.ps_suppkey = supplier.s_suppkey" is implemented using Hash Join.'], 'order by value ;': ['The clause "order by sum((p.ps_supplycost * (p.ps_availqty) asc" is implemented using external merge Sort.']
     #     }
     # }
+        if "connection-error" in query_output:
+            return html.Div([]), html.Div([]), "false", False, True
         if (query_output == {}):
             print("display error message")
-            return html.Div([]), None, "false", True
+            return html.Div([]), html.Div([]), "false", True, False
         else:
             
             div_components = []
@@ -604,7 +641,7 @@ def update_output(n_clicks, value):
             # print("HTML OUTPUT: {}".format(html_output))
             print("done executing")
             # print(html_output)
-            return html.Div(query_output), [dbc.Modal(
+            return html.Div(html_output), [dbc.Modal(
                 [
                     dbc.ModalHeader([dbc.ModalTitle("Loading"), dbc.Spinner(color="primary")], close_button=False)
                 ],
@@ -612,7 +649,7 @@ def update_output(n_clicks, value):
                 id="modal-loading",
                 size="lg",
                 is_open=False,
-            )], "false", False
+            )], "false", False, False
 
 if __name__ == '__main__':
     app.run_server(debug=True)
