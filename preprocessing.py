@@ -236,6 +236,7 @@ class PreProcessor:
         raw_clause_lst = []
         raw_tok_lst = []
         raw_clause = ""
+        is_between = False
         while i < len(clause_tokens):
             t: token.SQLToken = clause_tokens[i]
             raw_tok_lst.append(t.value)
@@ -245,6 +246,27 @@ class PreProcessor:
             if (t.value.lower() == "date"):
                 i += 1
                 continue
+            if (t.value.lower() == "between"):
+                val_count = 0
+                vals = []
+                between_index = i
+                i += 1
+                while i < len(clause_tokens) and val_count < 2:
+                    t = clause_tokens[i]
+                    raw_tok_lst.append(t.value)
+                    print("RAW TOK LST: {}".format(raw_tok_lst))
+                    if (t.value.lower() == "date" or t.value.lower() == "and"):
+                        i += 1
+                        continue
+                    vals.append(t.value.lower())
+                    val_count += 1
+                    i += 1
+                print("VALS: {}".format(vals))
+                tok_lst = [tok.value for tok in clause_tokens[last_index: between_index]]
+                col_name = " ".join(tok_lst)
+                tok_lst = ["(", col_name, ">=", vals[0], ")", "and", "(", col_name, "<=", vals[1], ")"]
+                print("TOK LST: {}".format(tok_lst))
+                is_between = True
             if (t.parenthesis_level != last_keyword_token.parenthesis_level) and (t.is_keyword and t.value.lower() not in ["and", "or", "not"]):
                 contains_subquery = True
                 subquery_start_index = i
@@ -289,17 +311,19 @@ class PreProcessor:
                 curr_clause_not = True
                 last_index = i + 1
             i += 1
-        if not contains_subquery:
+        if not contains_subquery and not is_between:
             tok_lst = [tok.value for tok in clause_tokens[last_index: i]]
             # print("Raw token list")
             # print(raw_tok_lst)
             raw_clause = " ".join(raw_tok_lst)
-        else:
+        elif not is_between:
             tok_lst = [tok.value for tok in clause_tokens[last_index: subquery_start_index - 1]] + [subquery_alias]
             raw_clause = " ".join(raw_tok_lst[:-2]) + subquery_alias
             contains_subquery = False
             subquery_start_index = None
         # print(tok_lst)
+        else:
+            raw_clause = " ".join(raw_tok_lst)
         if (curr_clause_not):
             # print("Found NOT clause")
             tok_lst[1] = self.not_transformations[tok_lst[1].lower()]
@@ -469,7 +493,7 @@ class PreProcessor:
                         i += 1
                         t = tokens[i]
                         # a new keyword besides "and", "or", "not" or "date" marks the end of a group of where clauses
-                        while ((not t.is_keyword) or (t.parenthesis_level > last_keyword_token.parenthesis_level) or (t.value.lower() in ["and", "or", "not", "date"])):
+                        while ((not t.is_keyword) or (t.parenthesis_level > last_keyword_token.parenthesis_level) or (t.value.lower() in ["and", "or", "not", "date", "between"])):
                             where_tokens.append(t)
                             i += 1
                             if i < len(tokens):
