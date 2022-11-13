@@ -1,6 +1,6 @@
 # CX4031 project 2
 
-## Installation Instructions for Dash
+## Instructions for Running
 
 1. pip install -r requirements.txt
 2. Run the main file using python project.py
