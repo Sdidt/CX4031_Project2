@@ -13,24 +13,45 @@ Afterwhich, annotated results regarding the choice of operation is then produced
 
 def getFromDict(dataDict, mapList):
     """
-    
+    A function to retrieve a value from a nested dictionary using a list of keys
+
+    Parameter dataDict: nested dictionary
+
+    Parameter mapList: list of keys
     """
     return reduce(operator.getitem, mapList, dataDict)
 
 def setInDict(dataDict, mapList, value):
     """
-    
+    A function to set a value in a nested dictionary using a list of keys
+
+    Parameter dataDict: nested dictionary
+
+    Parameter mapList: list of keys
+
+    Parameter value: value to be set
     """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
 
 class Annotator:
     """
-    A class the converts query dictionary into meaningful tree structure.
+    A class that makes use of outputs of preprocessor, generates QEPs, AQPs and generates meaningful annotation.
+    Helper class ResultParser is made use of. 
     """
 
     def __init__(self, query, decomposed_query, query_component_dict, db: DB,index_column_dict ) -> None:
         """
-        Initializes the class Annotator 
+        Constructor for class annotator
+
+        Parameter query: input SQL query string
+
+        Parameter decomposed_query: decomposed query output from preprocessor
+
+        Parameter query_component_dict: query component dictionary output from preprocessor
+
+        Parameter db: Instance of DB connection
+
+        Parameter index_column_dict: dictionary storing index related data for the database
         """
         self.query = query
         self.db = db
@@ -100,14 +121,13 @@ class Annotator:
     def capture_nodes(self, dct, parent=None, subquery_level=0):
         """
         Convert dictionary into a tree structure made up of nodes to faciliate further processing.
-
         This is done by recursively calling this function.
 
-        Parameter dct: query plan in dictionary format
+        Parameter dct: query plan in dictionary format (output of "EXPLAIN ANALYZE" from PostgreSQL)
 
         Parameter parent: the parent of the current node being captured
 
-        Parameter subquery_level: the level at which the the query is at (ie. main, subquery)
+        Parameter subquery_level: the level at which the the query is at (0 indicates highest level)
         """
         nodes = []
 
@@ -138,7 +158,7 @@ class Annotator:
 
     def generate_QEP(self):
         """
-        Generates the QEP by returning the output returned by database then passing it to capture_nodes
+        Generates the QEP by returning the output returned by PostgreSQL then passing it to capture_nodes
         """
         output_plan = self.db.execute('EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ' + self.query)[0][0][0]["Plan"]
         return self.capture_nodes(output_plan)
@@ -147,19 +167,19 @@ class Annotator:
         """
         Matches the node to the sql query 
 
-        Parameter node: node
+        Parameter node: Curent node being processed
 
-        Parameter key:
+        Parameter key: Key of current node-related keyword being processed
 
-        Parameter decomposed_query:
+        Parameter decomposed_query: Decomposed query structure at current query level 
 
-        Parameter query_component_dict:
+        Parameter query_component_dict: Query component dictionary structure at current query level
 
-        Parameter component_mapping: 
+        Parameter component_mapping: Current component mapping (filled up through this procedure)
 
-        Parameter curr_key_chain:
+        Parameter curr_key_chain: Current key chain for mapping to clause
 
-        Parameter i: 
+        Parameter i: Current query level
         """
         relevant_info = node.keywords
         optimal_key_chain = []
@@ -219,12 +239,12 @@ class Annotator:
             curr_key_chain.pop()
         return optimal_key_chain, optimal_clause, curr_optimal_score, merge_join_order_by_explanation
 
-    def find_match_in_decomposed_query(self, node: Node, i=0):
+    def find_match_in_decomposed_query(self, node: Node):
         """
+        Procedure to find match in the decomposed query, generate natural language explanations using AQPs generated 
+        and perform the complete mapping for a single node. 
         
-        Parameter node: 
-
-        Parameter i: 
+        Parameter node: current node being processed
         """
         for k, v in node.keywords.items():
             optimal_key_chain, optimal_clause, similarity_score, merge_join_order_by_explanation = self.traverse_and_find_best_match(node, k, self.decomposed_query, self.query_component_dict, self.component_mapping, [])
@@ -275,21 +295,21 @@ class Annotator:
     
     def annotate_nodes(self):
         """
-        
+        Procedure to go through all nodes in the QEP and find matches for each one
         """
         for node in self.QEP:
-            node.print_debug_info()
+            # node.print_debug_info()
             self.find_match_in_decomposed_query(node)
 
     def explain_costs(self, cost_dict, qep_node_type, qep_cost):
         """
         Returns a string which explains why an operation is chosen instead of the alternatives
 
-        Parameter cost_dict: 
+        Parameter cost_dict: cost dictionary that stores values of costs for different alternatives
 
-        Parameter qep_node_type: 
+        Parameter qep_node_type: type of the node being currently processed in the QEP
 
-        Parameter qep_cost: 
+        Parameter qep_cost: cost of the node begin currently processed in the QEP
         """
         if len(cost_dict) == 1:
             return " because no other option is available."
@@ -319,9 +339,11 @@ class Annotator:
 
     def cost_comparison_scan(self, node: Node, config_para_for_scans):
         """
+        Procedure to perform comparison of costs for any given scan type node with AQPs
+
         Parameter node: scan node of QEP
 
-        Parameter config_paras_scan: ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]
+        Parameter config_paras_scan: ["enable_bitmapscan", "enable_indexscan", "enable_indexonlyscan", "enable_seqscan", "enable_tidscan"]; the parameters for extracting AQPs for comparing scans
         """
         qep_node = node
         qep_node_type = qep_node.type
@@ -387,11 +409,11 @@ class Annotator:
 
     def cost_comparison_join(self, node: Node, config_para_for_join):
         """
-        Compares costs with other types of joins in the AQP
+        Procedure to perform comparison of costs for any given join type node with AQPs
 
         Parameter node: join node of QEP
 
-        Parameter config_para_for_join: ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]
+        Parameter config_para_for_join: ["enable_hashjoin", "enable_nestloop", "enable_mergejoin"]; the parameters for extracting AQPs for comparing joins
         """
 
         qep_node_type = node.type
